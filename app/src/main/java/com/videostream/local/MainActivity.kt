@@ -22,7 +22,7 @@ class MainActivity : AppCompatActivity() {
 
     private var service: StreamingService? = null
     private var isBound = false
-    private var observersAttached = false
+    private var observedService: StreamingService? = null
 
     private var selectedUri: Uri? = null
     private var selectedName: String? = null
@@ -107,9 +107,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun attachObservers() {
-        if (observersAttached) return
-        observersAttached = true
-        service?.isStreaming?.observe(this) { streaming ->
+        val currentService = service ?: return
+        if (observedService === currentService) return
+        observedService = currentService
+
+        currentService.isStreaming.observe(this) { streaming ->
             binding.toggleButton.text = getString(
                 if (streaming) R.string.stop_streaming else R.string.start_streaming
             )
@@ -119,12 +121,12 @@ class MainActivity : AppCompatActivity() {
                 binding.statusText.text = getString(R.string.status_idle)
             }
         }
-        service?.serverUrl?.observe(this) { url ->
+        currentService.serverUrl.observe(this) { url ->
             if (url != null) {
                 binding.statusText.text = getString(R.string.status_streaming_at, url)
             }
         }
-        service?.videoName?.observe(this) { name ->
+        currentService.videoName.observe(this) { name ->
             if (name != null && selectedUri == null) {
                 binding.selectedFileText.text = getString(R.string.selected_video, name)
             }

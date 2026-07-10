@@ -2,9 +2,16 @@
 <resources>
     <string name="app_name">Local Video Stream</string>
 
+    <string name="host_a_video">Host a Video</string>
+    <string name="watch_a_stream">Watch a Stream</string>
+
     <string name="choose_video">Choose Video File</string>
+    <string name="choose_folder">Choose Folder</string>
     <string name="no_video_selected">No video file selected</string>
     <string name="selected_video">Selected: %1$s</string>
+    <string name="selected_folder">Selected folder: %1$s</string>
+    <string name="library_summary">%1$s (%2$d videos)</string>
+    <string name="error_no_videos_found">No video files found in that folder</string>
 
     <string name="start_streaming">Start Streaming</string>
     <string name="stop_streaming">Stop Streaming</string>
@@ -19,4 +26,10 @@
     <string name="notification_streaming">Streaming at %1$s</string>
     <string name="notification_no_network">No network connection detected</string>
     <string name="notification_stop_action">Stop</string>
+
+    <string name="watch_address_hint">Host address (e.g. 192.168.1.23)</string>
+    <string name="watch_connect">Connect</string>
+    <string name="watch_hint">Enter the address shown on the hosting device and tap Connect</string>
+    <string name="watch_invalid_address">Enter a valid address</string>
+    <string name="watch_connection_failed">Could not connect. Check the address and that both devices are on the same network.</string>
 </resources>

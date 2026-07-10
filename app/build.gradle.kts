@@ -64,6 +64,7 @@ dependencies {
     implementation("androidx.constraintlayout:constraintlayout:2.1.4")
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.4")
     implementation("androidx.activity:activity-ktx:1.9.1")
+    implementation("androidx.documentfile:documentfile:1.0.1")
 
     implementation("org.nanohttpd:nanohttpd:2.3.1")
 }

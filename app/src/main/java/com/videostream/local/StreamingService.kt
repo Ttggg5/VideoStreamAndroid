@@ -13,14 +13,16 @@ import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
+import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.MutableLiveData
 
 /**
- * Foreground service that owns the embedded HTTP server, so serving a
- * chosen video file to the local network keeps going even while the app is
- * backgrounded. [MainActivity] binds to this service to observe status and
- * to start/stop streaming.
+ * Foreground service that owns the embedded HTTP server, so serving a chosen
+ * video file or folder of videos to the local network keeps going even while
+ * the app is backgrounded. [HostActivity] binds to this service to observe
+ * status and to start/stop streaming.
  */
 class StreamingService : Service() {
 
@@ -34,7 +36,7 @@ class StreamingService : Service() {
     val serverUrl = MutableLiveData<String?>(null)
     val videoName = MutableLiveData<String?>(null)
 
-    private var server: VideoFileHttpServer? = null
+    private var server: MediaHttpServer? = null
     private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onCreate() {
@@ -45,11 +47,7 @@ class StreamingService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> stopStreaming()
-            ACTION_START -> {
-                val uriString = intent.getStringExtra(EXTRA_VIDEO_URI)
-                val name = intent.getStringExtra(EXTRA_VIDEO_NAME) ?: "video"
-                if (uriString != null) startStreaming(Uri.parse(uriString), name)
-            }
+            ACTION_START -> handleStart(intent)
             else -> Unit
         }
         return START_NOT_STICKY
@@ -57,11 +55,58 @@ class StreamingService : Service() {
 
     override fun onBind(intent: Intent): IBinder = binder
 
-    private fun startStreaming(uri: Uri, displayName: String) {
+    private fun handleStart(intent: Intent) {
+        val name = intent.getStringExtra(EXTRA_VIDEO_NAME) ?: "video"
+        val fileUriString = intent.getStringExtra(EXTRA_VIDEO_URI)
+        val folderUriString = intent.getStringExtra(EXTRA_FOLDER_URI)
+        when {
+            fileUriString != null -> {
+                startStreaming(listOf(VideoEntry(0, name, Uri.parse(fileUriString))), name)
+            }
+            folderUriString != null -> {
+                val entries = scanFolderForVideos(Uri.parse(folderUriString))
+                val label = getString(R.string.library_summary, name, entries.size)
+                startStreaming(entries, label)
+            }
+        }
+    }
+
+    private fun scanFolderForVideos(treeUri: Uri): List<VideoEntry> {
+        val root = DocumentFile.fromTreeUri(this, treeUri) ?: return emptyList()
+        val results = mutableListOf<VideoEntry>()
+        scanDir(root, "", results, 0)
+        return results
+    }
+
+    private fun scanDir(dir: DocumentFile, prefix: String, results: MutableList<VideoEntry>, depth: Int) {
+        if (results.size >= MAX_LIBRARY_ENTRIES || depth > MAX_SCAN_DEPTH) return
+        for (child in dir.listFiles()) {
+            if (results.size >= MAX_LIBRARY_ENTRIES) break
+            val childName = child.name ?: continue
+            if (child.isDirectory) {
+                scanDir(child, "$prefix$childName/", results, depth + 1)
+            } else if (isVideoFile(child)) {
+                results.add(VideoEntry(results.size, "$prefix$childName", child.uri))
+            }
+        }
+    }
+
+    private fun isVideoFile(file: DocumentFile): Boolean {
+        val type = file.type
+        if (type != null && type.startsWith("video/")) return true
+        val name = file.name ?: return false
+        return VIDEO_EXTENSIONS.any { name.endsWith(it, ignoreCase = true) }
+    }
+
+    private fun startStreaming(entries: List<VideoEntry>, libraryLabel: String) {
         if (isStreaming.value == true) return
 
+        // startForeground() must be called promptly whenever the service was launched via
+        // startForegroundService() (as HostActivity always does), or Android kills the app with
+        // ForegroundServiceDidNotStartInTimeException — so this runs before the entries.isEmpty()
+        // check below, and that error path tears back down through stopStreaming() instead of
+        // returning early.
         acquireWakeLock()
-
         val notification = buildNotification(getString(R.string.notification_starting))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
@@ -69,7 +114,13 @@ class StreamingService : Service() {
             startForeground(NOTIFICATION_ID, notification)
         }
 
-        val httpServer = VideoFileHttpServer(HTTP_PORT, contentResolver, uri, displayName)
+        if (entries.isEmpty()) {
+            Toast.makeText(this, getString(R.string.error_no_videos_found), Toast.LENGTH_LONG).show()
+            stopStreaming()
+            return
+        }
+
+        val httpServer = MediaHttpServer(HTTP_PORT, contentResolver, entries, libraryLabel)
         try {
             httpServer.start(NANOHTTPD_TIMEOUT_MS, false)
             server = httpServer
@@ -79,7 +130,7 @@ class StreamingService : Service() {
             return
         }
 
-        videoName.postValue(displayName)
+        videoName.postValue(libraryLabel)
         val ip = NetworkUtils.getLocalIpAddress()
         val url = if (ip != null) "http://$ip:$HTTP_PORT" else null
         serverUrl.postValue(url)
@@ -162,11 +213,17 @@ class StreamingService : Service() {
         const val ACTION_START = "com.videostream.local.action.START"
         const val ACTION_STOP = "com.videostream.local.action.STOP"
         const val EXTRA_VIDEO_URI = "com.videostream.local.extra.VIDEO_URI"
+        const val EXTRA_FOLDER_URI = "com.videostream.local.extra.FOLDER_URI"
         const val EXTRA_VIDEO_NAME = "com.videostream.local.extra.VIDEO_NAME"
         const val HTTP_PORT = 8080
         private const val CHANNEL_ID = "streaming_channel"
         private const val NOTIFICATION_ID = 1
         private const val WAKE_LOCK_TIMEOUT_MS = 12 * 60 * 60 * 1000L // 12h safety cap
         private const val NANOHTTPD_TIMEOUT_MS = 5000
+        private const val MAX_LIBRARY_ENTRIES = 500
+        private const val MAX_SCAN_DEPTH = 6
+        private val VIDEO_EXTENSIONS = listOf(
+            ".mp4", ".mkv", ".webm", ".avi", ".mov", ".m4v", ".3gp", ".ts", ".flv", ".wmv", ".mpg", ".mpeg"
+        )
     }
 }

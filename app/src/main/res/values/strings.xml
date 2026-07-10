@@ -14,6 +14,13 @@
     <string name="error_no_videos_found">No video files found in that folder</string>
     <string name="selected_video_thumbnail">Selected video thumbnail</string>
 
+    <string name="option_flatten_folders">Show all videos in one list (ignore folder structure)</string>
+    <string name="option_default_sort">Default sort:</string>
+    <string name="option_autoplay_next">Autoplay next video</string>
+    <string name="sort_name">Name</string>
+    <string name="sort_date">Newest</string>
+    <string name="sort_size">Largest</string>
+
     <string name="start_streaming">Start Streaming</string>
     <string name="stop_streaming">Stop Streaming</string>
 

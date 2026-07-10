@@ -21,7 +21,13 @@ class MediaHttpServer(
     private val contentResolver: ContentResolver,
     private val entries: List<VideoEntry>,
     private val libraryName: String,
-    private val isFolderMode: Boolean
+    private val isFolderMode: Boolean,
+    /** When true, `/browse` ignores subfolders entirely and lists every video at once. */
+    private val flattenFolders: Boolean,
+    /** One of [SortMode]'s `param` values, used when a request doesn't specify `?sort=`. */
+    private val defaultSortParam: String,
+    /** Whether the player advances to the next playlist entry when a video ends. */
+    private val autoplayNext: Boolean
 ) : NanoHTTPD(port) {
 
     // Keyed by VideoEntry.id. An empty array means extraction was already tried and failed,
@@ -56,7 +62,7 @@ class MediaHttpServer(
             "/", "/index.html" -> serveIndex()
             "/browse" -> browsePage(
                 session.parameters["path"]?.firstOrNull().orEmpty(),
-                SortMode.fromParam(session.parameters["sort"]?.firstOrNull())
+                SortMode.fromParam(session.parameters["sort"]?.firstOrNull() ?: defaultSortParam)
             )
             "/watch" -> serveWatch(session)
             "/video" -> serveVideo(session)
@@ -76,13 +82,13 @@ class MediaHttpServer(
                 ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "No video available")
             return watchPage(single, SortMode.NAME)
         }
-        return browsePage("", SortMode.NAME)
+        return browsePage("", SortMode.fromParam(defaultSortParam))
     }
 
     private fun serveWatch(session: IHTTPSession): Response {
         val entry = entryFor(session)
             ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Video not found")
-        val sortMode = SortMode.fromParam(session.parameters["sort"]?.firstOrNull())
+        val sortMode = SortMode.fromParam(session.parameters["sort"]?.firstOrNull() ?: defaultSortParam)
         return watchPage(entry, sortMode)
     }
 
@@ -92,37 +98,56 @@ class MediaHttpServer(
         SortMode.SIZE -> videos.sortedByDescending { it.sizeBytes }
     }
 
-    /** Renders the videos and immediate subfolders that live directly inside [path]. */
+    /**
+     * Renders the videos and immediate subfolders that live directly inside [path]. When
+     * [flattenFolders] is on, [path] is ignored entirely and every video in the library is
+     * listed together, with its original folder shown as a subtitle for context.
+     */
     private fun browsePage(path: String, sortMode: SortMode): Response {
-        val prefix = if (path.isEmpty()) "" else "$path/"
-        val videos = sortVideos(entries.filter { it.folderPath == path }, sortMode)
-        val subfolders = entries
-            .filter { it.folderPath != path && it.folderPath.startsWith(prefix) }
-            .map { it.folderPath.removePrefix(prefix).substringBefore('/') }
-            .distinct()
-            .sorted()
+        val effectivePath = if (flattenFolders) "" else path
+        val prefix = if (effectivePath.isEmpty()) "" else "$effectivePath/"
+        val videos = if (flattenFolders) {
+            sortVideos(entries, sortMode)
+        } else {
+            sortVideos(entries.filter { it.folderPath == effectivePath }, sortMode)
+        }
+        val subfolders = if (flattenFolders) {
+            emptyList()
+        } else {
+            entries
+                .filter { it.folderPath != effectivePath && it.folderPath.startsWith(prefix) }
+                .map { it.folderPath.removePrefix(prefix).substringBefore('/') }
+                .distinct()
+                .sorted()
+        }
 
         if (videos.isEmpty() && subfolders.isEmpty()) {
             return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Folder not found")
         }
 
-        val title = if (path.isEmpty()) libraryName else path.substringAfterLast('/')
-        val backLink = if (path.isNotEmpty()) {
-            val parentPath = path.substringBeforeLast('/', "")
+        val title = if (effectivePath.isEmpty()) libraryName else effectivePath.substringAfterLast('/')
+        val backLink = if (effectivePath.isNotEmpty()) {
+            val parentPath = effectivePath.substringBeforeLast('/', "")
             "<li><a href=\"/browse?path=${encodePath(parentPath)}&sort=${sortMode.param}\">&larr; ..</a></li>"
         } else {
             ""
         }
         val folderItems = subfolders.joinToString("\n") { folderName ->
-            val childPath = if (path.isEmpty()) folderName else "$path/$folderName"
+            val childPath = if (effectivePath.isEmpty()) folderName else "$effectivePath/$folderName"
             "<li><a href=\"/browse?path=${encodePath(childPath)}&sort=${sortMode.param}\">&#128193; ${escapeHtml(folderName)}</a></li>"
         }
         val videoItems = videos.joinToString("\n") { entry ->
+            val subtitle = if (flattenFolders && entry.folderPath.isNotEmpty()) {
+                "<small>${escapeHtml(entry.folderPath)}</small>"
+            } else {
+                ""
+            }
             """
             <li>
               <a href="/watch?id=${entry.id}&sort=${sortMode.param}">
                 <img src="/thumbnail?id=${entry.id}" loading="lazy" alt="">
                 <span>${escapeHtml(entry.name)}</span>
+                $subtitle
               </a>
             </li>
             """.trimIndent()
@@ -131,7 +156,7 @@ class MediaHttpServer(
             if (mode == sortMode) {
                 "<span class=\"active\">${mode.label}</span>"
             } else {
-                "<a href=\"/browse?path=${encodePath(path)}&sort=${mode.param}\">${mode.label}</a>"
+                "<a href=\"/browse?path=${encodePath(effectivePath)}&sort=${mode.param}\">${mode.label}</a>"
             }
         }
         val sortBar = if (videos.size > 1) {
@@ -164,6 +189,7 @@ class MediaHttpServer(
                 ul.videos a:hover { background: #333; }
                 ul.videos img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #000; }
                 ul.videos span { padding: 8px; font-size: 13px; word-break: break-word; }
+                ul.videos small { padding: 0 8px 8px; margin-top: -8px; color: #888; font-size: 11px; word-break: break-word; }
               </style>
             </head>
             <body>
@@ -183,17 +209,19 @@ class MediaHttpServer(
     }
 
     private fun watchPage(entry: VideoEntry, sortMode: SortMode): Response {
-        // The playlist is the other videos alongside this one in the same folder — same
-        // scope as what the browse page would show, in the same sort order.
-        val siblings = if (isFolderMode) {
-            sortVideos(entries.filter { it.folderPath == entry.folderPath }, sortMode)
-        } else {
-            listOf(entry)
+        // The playlist is the other videos alongside this one — the same folder, or the whole
+        // library when folders are flattened — same scope the browse page would show, in the
+        // same sort order.
+        val siblings = when {
+            !isFolderMode -> listOf(entry)
+            flattenFolders -> sortVideos(entries, sortMode)
+            else -> sortVideos(entries.filter { it.folderPath == entry.folderPath }, sortMode)
         }
         val showPlaylist = isFolderMode && siblings.size > 1
 
         val backLink = if (isFolderMode) {
-            "<a class=\"back\" href=\"/browse?path=${encodePath(entry.folderPath)}&sort=${sortMode.param}\">&larr; Back</a>"
+            val backPath = if (flattenFolders) "" else entry.folderPath
+            "<a class=\"back\" href=\"/browse?path=${encodePath(backPath)}&sort=${sortMode.param}\">&larr; Back</a>"
         } else {
             ""
         }
@@ -251,6 +279,7 @@ class MediaHttpServer(
               (function () {
                 var playlist = [$playlistJson];
                 var currentId = ${entry.id};
+                var autoplayNext = ${autoplayNext};
                 var video = document.getElementById('player');
                 var titleEl = document.getElementById('currentTitle');
                 var listEl = document.getElementById('playlist');
@@ -294,6 +323,7 @@ class MediaHttpServer(
                 }
 
                 video.addEventListener('ended', function () {
+                  if (!autoplayNext) return;
                   var idx = indexOf(currentId);
                   if (idx >= 0 && idx + 1 < playlist.length) {
                     playItem(playlist[idx + 1].id, true);

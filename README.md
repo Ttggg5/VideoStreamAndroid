@@ -74,6 +74,16 @@ VLC can also open the `http://<ip>:8080/video` URL directly.
    500 videos) for playable files.
    A thumbnail preview appears once a single file is picked (folders
    don't get one, since there's no single representative frame).
+   Picking a folder also reveals a few options for how it's served:
+   - **Show all videos in one list** — flattens the folder structure
+     instead of preserving it, so the browse page lists every video at
+     once (each showing its original subfolder as a small caption)
+     instead of navigating into subfolders one at a time.
+   - **Default sort** — Name / Newest / Largest; sets the browse page's
+     initial order (a viewer can still switch it live from the sort bar).
+   - **Autoplay next video** — on by default; controls whether the
+     player automatically advances to the next playlist entry when a
+     video finishes.
 3. Grant the notification permission if prompted (Android 13+).
 4. Tap **Start Streaming**. The screen shows a URL like
    `http://192.168.1.23:8080`.

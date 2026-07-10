@@ -13,6 +13,7 @@ import android.os.Bundle
 import android.os.IBinder
 import android.provider.OpenableColumns
 import android.view.View
+import android.widget.ArrayAdapter
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -63,6 +64,12 @@ class HostActivity : AppCompatActivity() {
         binding = ActivityHostBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        binding.defaultSortSpinner.adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_dropdown_item,
+            arrayOf(getString(R.string.sort_name), getString(R.string.sort_date), getString(R.string.sort_size))
+        )
+
         binding.chooseFileButton.setOnClickListener {
             pickVideoFile.launch(arrayOf("video/*"))
         }
@@ -104,6 +111,7 @@ class HostActivity : AppCompatActivity() {
         binding.selectedFileText.text = getString(R.string.selected_video, selectedName)
         binding.toggleButton.isEnabled = true
         loadThumbnailPreview(uri)
+        setFolderOptionsVisible(false)
     }
 
     private fun onFolderSelected(uri: Uri) {
@@ -114,6 +122,14 @@ class HostActivity : AppCompatActivity() {
         binding.selectedFileText.text = getString(R.string.selected_folder, selectedName)
         binding.toggleButton.isEnabled = true
         hideThumbnailPreview()
+        setFolderOptionsVisible(true)
+    }
+
+    /** Flattening and default sort only make sense once there's a folder (with subfolders) to browse. */
+    private fun setFolderOptionsVisible(visible: Boolean) {
+        val visibility = if (visible) View.VISIBLE else View.GONE
+        binding.flattenSwitch.visibility = visibility
+        binding.sortOptionRow.visibility = visibility
     }
 
     /** Folders don't have a single representative thumbnail, so this only applies to single-file mode. */
@@ -200,8 +216,16 @@ class HostActivity : AppCompatActivity() {
         val intent = Intent(this, StreamingService::class.java).apply {
             action = StreamingService.ACTION_START
             putExtra(StreamingService.EXTRA_VIDEO_NAME, selectedName)
+            putExtra(StreamingService.EXTRA_AUTOPLAY_NEXT, binding.autoplaySwitch.isChecked)
             if (selectedIsFolder) {
                 putExtra(StreamingService.EXTRA_FOLDER_URI, uri.toString())
+                putExtra(StreamingService.EXTRA_FLATTEN, binding.flattenSwitch.isChecked)
+                putExtra(
+                    StreamingService.EXTRA_DEFAULT_SORT,
+                    SORT_VALUES.getOrElse(binding.defaultSortSpinner.selectedItemPosition) {
+                        StreamingService.DEFAULT_SORT_PARAM
+                    }
+                )
             } else {
                 putExtra(StreamingService.EXTRA_VIDEO_URI, uri.toString())
             }
@@ -214,5 +238,10 @@ class HostActivity : AppCompatActivity() {
             action = StreamingService.ACTION_STOP
         }
         startService(intent)
+    }
+
+    companion object {
+        // Must stay in the same order as the labels populating defaultSortSpinner's adapter.
+        private val SORT_VALUES = arrayOf("name", "date", "size")
     }
 }

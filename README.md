@@ -32,7 +32,11 @@ VLC can also open the `http://<ip>:8080/video` URL directly.
 - A physical Android device or emulator running Android 7.0 (API 24) or
   newer.
 - The streaming device and the viewing device must be on the **same**
-  Wi-Fi network.
+  local network. This works two ways:
+  - Both devices joined to the same external Wi-Fi network, or
+  - The streaming phone turns on its own **Wi-Fi hotspot** (Personal
+    Hotspot / Portable Wi-Fi Hotspot) and the viewing device connects to
+    it directly — no router or internet connection needed at all.
 
 ## Running it
 

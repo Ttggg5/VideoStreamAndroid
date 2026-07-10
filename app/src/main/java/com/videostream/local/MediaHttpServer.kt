@@ -4,19 +4,22 @@ import android.content.ContentResolver
 import android.os.ParcelFileDescriptor
 import fi.iki.elonen.NanoHTTPD
 import java.io.FileInputStream
+import java.net.URLEncoder
 
 /**
  * Serves one or more existing video files over HTTP with byte-range support, so a
  * browser or media player on another device can start playing and seek without
- * downloading the whole file first. When there's more than one [VideoEntry] (a
- * folder was chosen), the index page lists them so the viewer can pick which one
- * to watch; with a single entry it goes straight to the player.
+ * downloading the whole file first. In folder mode, `/browse` mirrors the chosen
+ * folder's actual directory structure (subfolders navigate further, matching entries'
+ * [VideoEntry.folderPath]) rather than flattening everything into one list; a plain
+ * single file goes straight to the player.
  */
 class MediaHttpServer(
     port: Int,
     private val contentResolver: ContentResolver,
     private val entries: List<VideoEntry>,
-    private val libraryName: String
+    private val libraryName: String,
+    private val isFolderMode: Boolean
 ) : NanoHTTPD(port) {
 
     /** Closes the underlying [ParcelFileDescriptor] together with the stream view over it. */
@@ -34,6 +37,7 @@ class MediaHttpServer(
     override fun serve(session: IHTTPSession): Response {
         return when (session.uri) {
             "/", "/index.html" -> serveIndex()
+            "/browse" -> browsePage(session.parameters["path"]?.firstOrNull().orEmpty())
             "/watch" -> serveWatch(session)
             "/video" -> serveVideo(session)
             else -> newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Not found")
@@ -46,23 +50,56 @@ class MediaHttpServer(
     }
 
     private fun serveIndex(): Response {
-        val single = entries.singleOrNull()
-        if (single != null) {
+        if (!isFolderMode) {
+            val single = entries.singleOrNull()
+                ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "No video available")
             return watchPage(single)
         }
-        if (entries.isEmpty()) {
-            return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "No videos available")
+        return browsePage("")
+    }
+
+    private fun serveWatch(session: IHTTPSession): Response {
+        val entry = entryFor(session)
+            ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Video not found")
+        return watchPage(entry)
+    }
+
+    /** Renders the videos and immediate subfolders that live directly inside [path]. */
+    private fun browsePage(path: String): Response {
+        val prefix = if (path.isEmpty()) "" else "$path/"
+        val videos = entries.filter { it.folderPath == path }.sortedBy { it.name }
+        val subfolders = entries
+            .filter { it.folderPath != path && it.folderPath.startsWith(prefix) }
+            .map { it.folderPath.removePrefix(prefix).substringBefore('/') }
+            .distinct()
+            .sorted()
+
+        if (videos.isEmpty() && subfolders.isEmpty()) {
+            return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Folder not found")
         }
-        val items = entries.joinToString("\n") { entry ->
-            "<li><a href=\"/watch?id=${entry.id}\">${escapeHtml(entry.name)}</a></li>"
+
+        val title = if (path.isEmpty()) libraryName else path.substringAfterLast('/')
+        val backLink = if (path.isNotEmpty()) {
+            val parentPath = path.substringBeforeLast('/', "")
+            "<li><a href=\"/browse?path=${encodePath(parentPath)}\">&larr; ..</a></li>"
+        } else {
+            ""
         }
+        val folderItems = subfolders.joinToString("\n") { folderName ->
+            val childPath = if (path.isEmpty()) folderName else "$path/$folderName"
+            "<li><a href=\"/browse?path=${encodePath(childPath)}\">&#128193; ${escapeHtml(folderName)}</a></li>"
+        }
+        val videoItems = videos.joinToString("\n") { entry ->
+            "<li><a href=\"/watch?id=${entry.id}\">&#127909; ${escapeHtml(entry.name)}</a></li>"
+        }
+
         val html = """
             <!DOCTYPE html>
             <html>
             <head>
               <meta charset="utf-8">
               <meta name="viewport" content="width=device-width, initial-scale=1">
-              <title>${escapeHtml(libraryName)}</title>
+              <title>${escapeHtml(title)}</title>
               <style>
                 body { margin: 0; padding: 24px; background: #111; color: #eee; font-family: sans-serif; }
                 h1 { font-size: 20px; }
@@ -73,9 +110,11 @@ class MediaHttpServer(
               </style>
             </head>
             <body>
-              <h1>${escapeHtml(libraryName)}</h1>
+              <h1>${escapeHtml(title)}</h1>
               <ul>
-                $items
+                $backLink
+                $folderItems
+                $videoItems
               </ul>
             </body>
             </html>
@@ -83,15 +122,9 @@ class MediaHttpServer(
         return newFixedLengthResponse(Response.Status.OK, "text/html", html)
     }
 
-    private fun serveWatch(session: IHTTPSession): Response {
-        val entry = entryFor(session)
-            ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Video not found")
-        return watchPage(entry)
-    }
-
     private fun watchPage(entry: VideoEntry): Response {
-        val backLink = if (entries.size > 1) {
-            "<p><a class=\"back\" href=\"/\">&larr; ${escapeHtml(libraryName)}</a></p>"
+        val backLink = if (isFolderMode) {
+            "<p><a class=\"back\" href=\"/browse?path=${encodePath(entry.folderPath)}\">&larr; Back</a></p>"
         } else {
             ""
         }
@@ -168,6 +201,8 @@ class MediaHttpServer(
         }
         return response
     }
+
+    private fun encodePath(path: String): String = URLEncoder.encode(path, "UTF-8")
 
     private fun escapeHtml(text: String): String =
         text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")

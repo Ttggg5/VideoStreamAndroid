@@ -20,8 +20,10 @@ with a built-in screen to open another device's stream.
   browser's `<video>` tag or a media player can start playing immediately
   and seek around without re-downloading — this is progressive streaming,
   not a full download. When a folder was chosen, the same server exposes
-  a simple web page listing every video file found in it (recursively),
-  so a viewer picks which one to watch before playback starts.
+  a browsable web page mirroring that folder's actual structure — subfolders
+  stay subfolders, navigable one level at a time — so a viewer finds and
+  picks a video the same way they would in a file browser, rather than
+  facing one giant flattened list.
 - **Stay alive**: the server runs inside a foreground `Service`, so
   streaming keeps going even if you switch away from the app (the
   notification shows the URL and has a Stop action).
@@ -65,16 +67,18 @@ VLC can also open the `http://<ip>:8080/video` URL directly.
    `http://192.168.1.23:8080`.
 5. On another device connected to the same Wi-Fi (or the browser field
    above, or VLC's "Open Network Stream"), open that URL. For a folder,
-   you'll see a list of videos to pick from first; for a single file, it
-   starts playing immediately.
+   you'll see it laid out just like on disk — browse into subfolders,
+   tap a video to play it, tap "back" to go up a level; for a single
+   file, it starts playing immediately.
 
 ### Watching from this app
 
 1. Tap **Watch a Stream**.
 2. Enter the address shown on the hosting device (just the IP, e.g.
    `192.168.1.23`, or the full URL) and tap **Connect**.
-3. The host's page loads in an embedded browser — pick a video from the
-   list (folder mode) or it starts playing right away (single-file mode).
+3. The host's page loads in an embedded browser — browse the folder and
+   pick a video (folder mode) or it starts playing right away
+   (single-file mode).
 
 ## Project layout
 
@@ -84,7 +88,7 @@ app/src/main/java/com/videostream/local/
   HostActivity.kt         Host UI: file/folder picker, start/stop, notification permission
   WatchActivity.kt        Viewer UI: address input + embedded WebView browser
   StreamingService.kt      Foreground service hosting the HTTP server; scans folders for videos
-  MediaHttpServer.kt      NanoHTTPD server; serves a video list page and byte-range video streaming
+  MediaHttpServer.kt      NanoHTTPD server; serves a folder-structured browsing UI and byte-range video streaming
   VideoEntry.kt            One playable video (id, display name, content Uri)
   NetworkUtils.kt          Finds the device's local IPv4 address
 ```

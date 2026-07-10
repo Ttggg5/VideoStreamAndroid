@@ -61,12 +61,13 @@ class StreamingService : Service() {
         val folderUriString = intent.getStringExtra(EXTRA_FOLDER_URI)
         when {
             fileUriString != null -> {
-                startStreaming(listOf(VideoEntry(0, name, Uri.parse(fileUriString))), name)
+                val entry = VideoEntry(0, name, folderPath = "", uri = Uri.parse(fileUriString))
+                startStreaming(listOf(entry), name, isFolderMode = false)
             }
             folderUriString != null -> {
                 val entries = scanFolderForVideos(Uri.parse(folderUriString))
                 val label = getString(R.string.library_summary, name, entries.size)
-                startStreaming(entries, label)
+                startStreaming(entries, label, isFolderMode = true)
             }
         }
     }
@@ -78,15 +79,17 @@ class StreamingService : Service() {
         return results
     }
 
-    private fun scanDir(dir: DocumentFile, prefix: String, results: MutableList<VideoEntry>, depth: Int) {
+    /** [folderPath] is this directory's path relative to the chosen root ("" for the root itself). */
+    private fun scanDir(dir: DocumentFile, folderPath: String, results: MutableList<VideoEntry>, depth: Int) {
         if (results.size >= MAX_LIBRARY_ENTRIES || depth > MAX_SCAN_DEPTH) return
         for (child in dir.listFiles()) {
             if (results.size >= MAX_LIBRARY_ENTRIES) break
             val childName = child.name ?: continue
             if (child.isDirectory) {
-                scanDir(child, "$prefix$childName/", results, depth + 1)
+                val childPath = if (folderPath.isEmpty()) childName else "$folderPath/$childName"
+                scanDir(child, childPath, results, depth + 1)
             } else if (isVideoFile(child)) {
-                results.add(VideoEntry(results.size, "$prefix$childName", child.uri))
+                results.add(VideoEntry(results.size, childName, folderPath, child.uri))
             }
         }
     }
@@ -98,7 +101,7 @@ class StreamingService : Service() {
         return VIDEO_EXTENSIONS.any { name.endsWith(it, ignoreCase = true) }
     }
 
-    private fun startStreaming(entries: List<VideoEntry>, libraryLabel: String) {
+    private fun startStreaming(entries: List<VideoEntry>, libraryLabel: String, isFolderMode: Boolean) {
         if (isStreaming.value == true) return
 
         // startForeground() must be called promptly whenever the service was launched via
@@ -120,7 +123,7 @@ class StreamingService : Service() {
             return
         }
 
-        val httpServer = MediaHttpServer(HTTP_PORT, contentResolver, entries, libraryLabel)
+        val httpServer = MediaHttpServer(HTTP_PORT, contentResolver, entries, libraryLabel, isFolderMode)
         try {
             httpServer.start(NANOHTTPD_TIMEOUT_MS, false)
             server = httpServer

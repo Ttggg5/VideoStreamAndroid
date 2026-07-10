@@ -413,6 +413,48 @@ class MediaHttpServer(
                 .player { flex: 1; position: relative; background: #000; min-width: 0; }
                 .video-js { width: 100%; height: 100%; }
                 .video-js .vjs-tech { object-fit: contain; }
+                /* Re-skins video.js's default look (grey-blue box skin) to match this app's
+                   dark surfaces + accent color, reusing the same play-badge circle motif as
+                   the thumbnails on the browse page. */
+                .video-js .vjs-big-play-button {
+                  width: 64px; height: 64px; line-height: 64px;
+                  margin: -32px 0 0 -32px;
+                  font-size: 26px;
+                  border: none;
+                  border-radius: 50%;
+                  background-color: rgba(0, 0, 0, 0.55);
+                  transition: background-color 0.15s ease;
+                }
+                .video-js:hover .vjs-big-play-button,
+                .video-js .vjs-big-play-button:focus,
+                .video-js .vjs-big-play-button:hover {
+                  border: none;
+                  background-color: var(--accent);
+                }
+                .video-js .vjs-control-bar { background-color: rgba(17, 19, 25, 0.85); }
+                .video-js .vjs-slider { background-color: rgba(255, 255, 255, 0.15); }
+                .video-js .vjs-play-progress,
+                .video-js .vjs-volume-level {
+                  background-color: var(--accent);
+                }
+                .video-js .vjs-load-progress div { background: rgba(74, 95, 255, 0.35); }
+                .video-js .vjs-control:focus:before,
+                .video-js .vjs-control:hover:before {
+                  text-shadow: 0 0 1em var(--accent);
+                }
+                .video-js .vjs-menu-content { background-color: #1c1f28; border-radius: 10px; overflow: hidden; }
+                .video-js .vjs-menu-item:hover,
+                .video-js .vjs-menu li.vjs-menu-item:focus,
+                .video-js .vjs-menu li.vjs-menu-item:hover {
+                  background-color: rgba(74, 95, 255, 0.25);
+                }
+                .video-js .vjs-selected:hover,
+                .video-js .vjs-menu li.vjs-selected,
+                .video-js .vjs-menu li.vjs-selected:focus,
+                .video-js .vjs-menu li.vjs-selected:hover {
+                  background-color: var(--accent);
+                  color: #fff;
+                }
                 .navOverlayBtn {
                   position: absolute;
                   top: 50%;

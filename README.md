@@ -31,7 +31,10 @@ with a built-in screen to open another device's stream.
 - **Player**: the actual player is [video.js](https://videojs.com), bundled
   under `assets/videojs/` and served from `/assets/...` so it works with
   no internet access on the viewing device, same as everything else this
-  server serves — no CDN dependency.
+  server serves — no CDN dependency. Its default grey-blue skin is
+  re-themed with a CSS override in the watch page (big play button,
+  control bar, progress/volume fill, menus) to match the rest of the
+  app's dark, accent-colored look, rather than the stock video.js style.
 - **Per-viewer controls, not host settings**: whether to flatten the
   folder view into one list, autoplay the next video, and shuffle
   playback are choices each viewer makes on the page itself — a

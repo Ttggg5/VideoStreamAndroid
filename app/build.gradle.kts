@@ -3,6 +3,11 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Optional release signing: only used when a real keystore is present (e.g. decoded
+// from a CI secret). Falls back to the debug key so `assembleRelease` always works.
+val releaseKeystorePath = System.getenv("KEYSTORE_PATH")
+val hasReleaseKeystore = releaseKeystorePath != null && file(releaseKeystorePath).exists()
+
 android {
     namespace = "com.videostream.local"
     compileSdk = 34
@@ -15,8 +20,24 @@ android {
         versionName = "1.0"
     }
 
+    signingConfigs {
+        if (hasReleaseKeystore) {
+            create("release") {
+                storeFile = file(releaseKeystorePath!!)
+                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = if (hasReleaseKeystore) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }

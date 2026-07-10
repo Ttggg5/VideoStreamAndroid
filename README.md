@@ -1,5 +1,7 @@
 # VideoStreamAndroid
 
+![Android CI/CD](https://github.com/Ttggg5/VideoStreamAndroid/actions/workflows/android-ci-cd.yml/badge.svg)
+
 An Android app that streams a video file already stored on the phone to
 any device on the same local network (Wi-Fi/LAN) — open a URL in a
 browser on your laptop, TV, or another phone and start watching, without
@@ -54,6 +56,42 @@ app/src/main/java/com/videostream/local/
   VideoFileHttpServer.kt   NanoHTTPD server; serves the file with byte-range support
   NetworkUtils.kt          Finds the device's local IPv4 address
 ```
+
+## CI/CD
+
+`.github/workflows/android-ci-cd.yml` runs on GitHub Actions:
+
+- **Every push and pull request**: runs unit tests and builds a debug APK,
+  uploaded as a workflow artifact (visible on the Actions run page under
+  "Artifacts") — this is the CI gate.
+- **Pushing a tag matching `v*.*.*`** (e.g. `v1.0.0`): additionally builds
+  a release APK and publishes it to a new [GitHub Release](../../releases)
+  with the APK attached — this is the CD/publish step.
+
+To cut a release:
+
+```sh
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+By default the release APK is signed with the auto-generated debug key
+(installable for testing, not meant for the Play Store). To have CI sign
+it with your own key instead, add these repository secrets under
+**Settings → Secrets and variables → Actions**, and the workflow will pick
+them up automatically — no workflow changes needed:
+
+| Secret              | Value                                              |
+|----------------------|----------------------------------------------------|
+| `KEYSTORE_BASE64`    | `base64 -i your.keystore` output                    |
+| `KEYSTORE_PASSWORD`  | keystore password                                   |
+| `KEY_ALIAS`          | key alias                                           |
+| `KEY_PASSWORD`       | key password                                        |
+
+This repo doesn't publish to the Google Play Store — that needs a Play
+Console developer account and a service-account key that only you can
+provide. If you want that added later, the release job is the place to
+plug in `r0adkll/upload-google-play` (or similar) once those secrets exist.
 
 ## Known limitations
 

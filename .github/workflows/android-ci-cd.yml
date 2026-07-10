@@ -27,24 +27,19 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Cache Gradle
-        uses: actions/cache@v4
+      # Installs a real Gradle distribution and runs it directly, instead of relying on
+      # a committed gradle-wrapper.jar (this repo intentionally doesn't ship a wrapper
+      # binary; Android Studio regenerates it locally on first sync).
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
         with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            gradle-${{ runner.os }}-
-
-      - name: Make gradlew executable
-        run: chmod +x gradlew
+          gradle-version: "8.7"
 
       - name: Run unit tests
-        run: ./gradlew testDebugUnitTest --stacktrace
+        run: gradle testDebugUnitTest --stacktrace
 
       - name: Build debug APK
-        run: ./gradlew assembleDebug --stacktrace
+        run: gradle assembleDebug --stacktrace
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
@@ -70,18 +65,10 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Cache Gradle
-        uses: actions/cache@v4
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
         with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-          restore-keys: |
-            gradle-${{ runner.os }}-
-
-      - name: Make gradlew executable
-        run: chmod +x gradlew
+          gradle-version: "8.7"
 
       # Only produces a file when the KEYSTORE_BASE64 secret is set. If it's absent,
       # app/build.gradle.kts falls back to signing the release build with the debug key,
@@ -100,7 +87,7 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: ./gradlew assembleRelease --stacktrace
+        run: gradle assembleRelease --stacktrace
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

@@ -68,6 +68,13 @@ app/src/main/java/com/videostream/local/
   a release APK and publishes it to a new [GitHub Release](../../releases)
   with the APK attached — this is the CD/publish step.
 
+CI installs Gradle itself via `gradle/actions/setup-gradle` and runs
+`gradle` directly, rather than `./gradlew`. This repo's `gradlew` /
+`gradlew.bat` scripts are checked in for convenience, but the binary
+`gradle-wrapper.jar` they need isn't committed — Android Studio
+regenerates it automatically the first time you open the project (with
+internet access), which is why CI doesn't rely on it either.
+
 To cut a release:
 
 ```sh

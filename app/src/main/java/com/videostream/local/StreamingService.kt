@@ -89,7 +89,16 @@ class StreamingService : Service() {
                 val childPath = if (folderPath.isEmpty()) childName else "$folderPath/$childName"
                 scanDir(child, childPath, results, depth + 1)
             } else if (isVideoFile(child)) {
-                results.add(VideoEntry(results.size, childName, folderPath, child.uri))
+                results.add(
+                    VideoEntry(
+                        id = results.size,
+                        name = childName,
+                        folderPath = folderPath,
+                        uri = child.uri,
+                        lastModified = child.lastModified(),
+                        sizeBytes = child.length()
+                    )
+                )
             }
         }
     }

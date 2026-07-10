@@ -25,7 +25,9 @@ with a built-in screen to open another device's stream.
   picks a video the same way they would in a file browser, rather than
   facing one giant flattened list. Each video shows a thumbnail (a frame
   grabbed a second into the file via `MediaMetadataRetriever`), both in
-  the folder browsing grid and as the player's poster image.
+  the folder browsing grid and as the player's poster image. A folder
+  with more than one video gets a **Sort** bar (Name / Newest / Largest)
+  that carries through folder navigation and back out of the player.
 - **Stay alive**: the server runs inside a foreground `Service`, so
   streaming keeps going even if you switch away from the app (the
   notification shows the URL and has a Stop action).
@@ -94,7 +96,7 @@ app/src/main/java/com/videostream/local/
   StreamingService.kt      Foreground service hosting the HTTP server; scans folders for videos
   MediaHttpServer.kt      NanoHTTPD server; serves a folder-structured browsing UI and byte-range video streaming
   ThumbnailUtil.kt         Extracts a downscaled JPEG preview frame from a video, used by both the server and HostActivity
-  VideoEntry.kt            One playable video (id, display name, folder path, content Uri)
+  VideoEntry.kt            One playable video (id, display name, folder path, content Uri, size/date for sorting)
   NetworkUtils.kt          Finds the device's local IPv4 address
 ```
 

@@ -40,10 +40,24 @@ class MediaHttpServer(
         }
     }
 
+    /** How the videos in [browsePage] are ordered; switched via the `sort` query param. */
+    private enum class SortMode(val param: String, val label: String) {
+        NAME("name", "Name"),
+        DATE("date", "Newest"),
+        SIZE("size", "Largest");
+
+        companion object {
+            fun fromParam(value: String?): SortMode = values().firstOrNull { it.param == value } ?: NAME
+        }
+    }
+
     override fun serve(session: IHTTPSession): Response {
         return when (session.uri) {
             "/", "/index.html" -> serveIndex()
-            "/browse" -> browsePage(session.parameters["path"]?.firstOrNull().orEmpty())
+            "/browse" -> browsePage(
+                session.parameters["path"]?.firstOrNull().orEmpty(),
+                SortMode.fromParam(session.parameters["sort"]?.firstOrNull())
+            )
             "/watch" -> serveWatch(session)
             "/video" -> serveVideo(session)
             "/thumbnail" -> serveThumbnail(session)
@@ -60,21 +74,28 @@ class MediaHttpServer(
         if (!isFolderMode) {
             val single = entries.singleOrNull()
                 ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "No video available")
-            return watchPage(single)
+            return watchPage(single, SortMode.NAME)
         }
-        return browsePage("")
+        return browsePage("", SortMode.NAME)
     }
 
     private fun serveWatch(session: IHTTPSession): Response {
         val entry = entryFor(session)
             ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Video not found")
-        return watchPage(entry)
+        val sortMode = SortMode.fromParam(session.parameters["sort"]?.firstOrNull())
+        return watchPage(entry, sortMode)
+    }
+
+    private fun sortVideos(videos: List<VideoEntry>, sortMode: SortMode): List<VideoEntry> = when (sortMode) {
+        SortMode.NAME -> videos.sortedBy { it.name.lowercase() }
+        SortMode.DATE -> videos.sortedByDescending { it.lastModified }
+        SortMode.SIZE -> videos.sortedByDescending { it.sizeBytes }
     }
 
     /** Renders the videos and immediate subfolders that live directly inside [path]. */
-    private fun browsePage(path: String): Response {
+    private fun browsePage(path: String, sortMode: SortMode): Response {
         val prefix = if (path.isEmpty()) "" else "$path/"
-        val videos = entries.filter { it.folderPath == path }.sortedBy { it.name }
+        val videos = sortVideos(entries.filter { it.folderPath == path }, sortMode)
         val subfolders = entries
             .filter { it.folderPath != path && it.folderPath.startsWith(prefix) }
             .map { it.folderPath.removePrefix(prefix).substringBefore('/') }
@@ -88,23 +109,35 @@ class MediaHttpServer(
         val title = if (path.isEmpty()) libraryName else path.substringAfterLast('/')
         val backLink = if (path.isNotEmpty()) {
             val parentPath = path.substringBeforeLast('/', "")
-            "<li><a href=\"/browse?path=${encodePath(parentPath)}\">&larr; ..</a></li>"
+            "<li><a href=\"/browse?path=${encodePath(parentPath)}&sort=${sortMode.param}\">&larr; ..</a></li>"
         } else {
             ""
         }
         val folderItems = subfolders.joinToString("\n") { folderName ->
             val childPath = if (path.isEmpty()) folderName else "$path/$folderName"
-            "<li><a href=\"/browse?path=${encodePath(childPath)}\">&#128193; ${escapeHtml(folderName)}</a></li>"
+            "<li><a href=\"/browse?path=${encodePath(childPath)}&sort=${sortMode.param}\">&#128193; ${escapeHtml(folderName)}</a></li>"
         }
         val videoItems = videos.joinToString("\n") { entry ->
             """
             <li>
-              <a href="/watch?id=${entry.id}">
+              <a href="/watch?id=${entry.id}&sort=${sortMode.param}">
                 <img src="/thumbnail?id=${entry.id}" loading="lazy" alt="">
                 <span>${escapeHtml(entry.name)}</span>
               </a>
             </li>
             """.trimIndent()
+        }
+        val sortLinks = SortMode.values().joinToString(" ") { mode ->
+            if (mode == sortMode) {
+                "<span class=\"active\">${mode.label}</span>"
+            } else {
+                "<a href=\"/browse?path=${encodePath(path)}&sort=${mode.param}\">${mode.label}</a>"
+            }
+        }
+        val sortBar = if (videos.size > 1) {
+            "<div class=\"sortbar\"><span class=\"label\">Sort:</span> $sortLinks</div>"
+        } else {
+            ""
         }
 
         val html = """
@@ -117,6 +150,11 @@ class MediaHttpServer(
               <style>
                 body { margin: 0; padding: 24px; background: #111; color: #eee; font-family: sans-serif; }
                 h1 { font-size: 20px; }
+                .sortbar { margin: 0 0 16px; font-size: 13px; }
+                .sortbar .label { color: #888; margin-right: 8px; }
+                .sortbar a, .sortbar .active { margin-right: 12px; text-decoration: none; }
+                .sortbar a { color: #9cf; }
+                .sortbar .active { color: #fff; font-weight: bold; }
                 ul.folders { list-style: none; padding: 0; margin: 0 0 16px; }
                 ul.folders li { margin: 4px 0; }
                 ul.folders a { display: block; padding: 12px 16px; background: #222; color: #fff; text-decoration: none; border-radius: 8px; }
@@ -134,6 +172,7 @@ class MediaHttpServer(
                 $backLink
                 $folderItems
               </ul>
+              $sortBar
               <ul class="videos">
                 $videoItems
               </ul>
@@ -143,9 +182,9 @@ class MediaHttpServer(
         return newFixedLengthResponse(Response.Status.OK, "text/html", html)
     }
 
-    private fun watchPage(entry: VideoEntry): Response {
+    private fun watchPage(entry: VideoEntry, sortMode: SortMode): Response {
         val backLink = if (isFolderMode) {
-            "<p><a class=\"back\" href=\"/browse?path=${encodePath(entry.folderPath)}\">&larr; Back</a></p>"
+            "<p><a class=\"back\" href=\"/browse?path=${encodePath(entry.folderPath)}&sort=${sortMode.param}\">&larr; Back</a></p>"
         } else {
             ""
         }

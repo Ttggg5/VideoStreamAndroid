@@ -7,11 +7,14 @@ import android.net.Uri
  * chosen folder. [folderPath] is the entry's directory relative to the chosen root,
  * using '/' as a separator and "" for the root itself — it's what lets the web UI
  * browse the folder the same way it's laid out on disk instead of flattening everything
- * into one list.
+ * into one list. [lastModified] (epoch millis) and [sizeBytes] back the Date/Size sort
+ * options on that page.
  */
 data class VideoEntry(
     val id: Int,
     val name: String,
     val folderPath: String,
-    val uri: Uri
+    val uri: Uri,
+    val lastModified: Long = 0L,
+    val sizeBytes: Long = 0L
 )

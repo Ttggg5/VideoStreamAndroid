@@ -59,7 +59,6 @@ class StreamingService : Service() {
         val name = intent.getStringExtra(EXTRA_VIDEO_NAME) ?: "video"
         val fileUriString = intent.getStringExtra(EXTRA_VIDEO_URI)
         val folderUriString = intent.getStringExtra(EXTRA_FOLDER_URI)
-        val autoplayNext = intent.getBooleanExtra(EXTRA_AUTOPLAY_NEXT, true)
         when {
             fileUriString != null -> {
                 val entry = VideoEntry(0, name, folderPath = "", uri = Uri.parse(fileUriString))
@@ -67,9 +66,7 @@ class StreamingService : Service() {
                     entries = listOf(entry),
                     libraryLabel = name,
                     isFolderMode = false,
-                    flattenFolders = false,
-                    defaultSort = DEFAULT_SORT_PARAM,
-                    autoplayNext = autoplayNext
+                    defaultSort = DEFAULT_SORT_PARAM
                 )
             }
             folderUriString != null -> {
@@ -79,9 +76,7 @@ class StreamingService : Service() {
                     entries = entries,
                     libraryLabel = label,
                     isFolderMode = true,
-                    flattenFolders = intent.getBooleanExtra(EXTRA_FLATTEN, false),
-                    defaultSort = intent.getStringExtra(EXTRA_DEFAULT_SORT) ?: DEFAULT_SORT_PARAM,
-                    autoplayNext = autoplayNext
+                    defaultSort = intent.getStringExtra(EXTRA_DEFAULT_SORT) ?: DEFAULT_SORT_PARAM
                 )
             }
         }
@@ -129,9 +124,7 @@ class StreamingService : Service() {
         entries: List<VideoEntry>,
         libraryLabel: String,
         isFolderMode: Boolean,
-        flattenFolders: Boolean,
-        defaultSort: String,
-        autoplayNext: Boolean
+        defaultSort: String
     ) {
         if (isStreaming.value == true) return
 
@@ -155,8 +148,7 @@ class StreamingService : Service() {
         }
 
         val httpServer = MediaHttpServer(
-            HTTP_PORT, contentResolver, entries, libraryLabel, isFolderMode,
-            flattenFolders, defaultSort, autoplayNext
+            HTTP_PORT, contentResolver, entries, libraryLabel, isFolderMode, defaultSort
         )
         try {
             httpServer.start(NANOHTTPD_TIMEOUT_MS, false)
@@ -252,9 +244,7 @@ class StreamingService : Service() {
         const val EXTRA_VIDEO_URI = "com.videostream.local.extra.VIDEO_URI"
         const val EXTRA_FOLDER_URI = "com.videostream.local.extra.FOLDER_URI"
         const val EXTRA_VIDEO_NAME = "com.videostream.local.extra.VIDEO_NAME"
-        const val EXTRA_FLATTEN = "com.videostream.local.extra.FLATTEN"
         const val EXTRA_DEFAULT_SORT = "com.videostream.local.extra.DEFAULT_SORT"
-        const val EXTRA_AUTOPLAY_NEXT = "com.videostream.local.extra.AUTOPLAY_NEXT"
         const val HTTP_PORT = 8080
         const val DEFAULT_SORT_PARAM = "name"
         private const val CHANNEL_ID = "streaming_channel"

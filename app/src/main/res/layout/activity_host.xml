@@ -59,54 +59,29 @@
         tools:visibility="visible" />
 
     <LinearLayout
-        android:id="@+id/optionsSection"
+        android:id="@+id/sortOptionRow"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
-        android:orientation="vertical"
+        android:layout_marginTop="16dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:visibility="gone"
         app:layout_constraintTop_toBottomOf="@id/thumbnailPreview"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintEnd_toEndOf="parent"
+        tools:visibility="visible">
 
-        <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/flattenSwitch"
-            android:layout_width="match_parent"
+        <TextView
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:visibility="gone"
-            android:text="@string/option_flatten_folders"
-            tools:visibility="visible" />
+            android:layout_marginEnd="8dp"
+            android:text="@string/option_default_sort" />
 
-        <LinearLayout
-            android:id="@+id/sortOptionRow"
-            android:layout_width="match_parent"
+        <Spinner
+            android:id="@+id/defaultSortSpinner"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:visibility="gone"
-            tools:visibility="visible">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
-                android:text="@string/option_default_sort" />
-
-            <Spinner
-                android:id="@+id/defaultSortSpinner"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1" />
-
-        </LinearLayout>
-
-        <com.google.android.material.materialswitch.MaterialSwitch
-            android:id="@+id/autoplaySwitch"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:checked="true"
-            android:text="@string/option_autoplay_next" />
+            android:layout_weight="1" />
 
     </LinearLayout>
 
@@ -118,7 +93,7 @@
         android:gravity="center"
         android:textSize="16sp"
         android:text="@string/status_idle"
-        app:layout_constraintTop_toBottomOf="@id/optionsSection"
+        app:layout_constraintTop_toBottomOf="@id/sortOptionRow"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 

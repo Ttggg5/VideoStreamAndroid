@@ -20,20 +20,26 @@ with a built-in screen to open another device's stream.
   browser's `<video>` tag or a media player can start playing immediately
   and seek around without re-downloading — this is progressive streaming,
   not a full download. When a folder was chosen, the same server exposes
-  a browsable web page mirroring that folder's actual structure — subfolders
-  stay subfolders, navigable one level at a time — so a viewer finds and
-  picks a video the same way they would in a file browser, rather than
-  facing one giant flattened list. Each video shows a thumbnail (a frame
-  grabbed a second into the file via `MediaMetadataRetriever`), both in
-  the folder browsing grid and as the player's poster image. A folder
-  with more than one video gets a **Sort** bar (Name / Newest / Largest)
-  that carries through folder navigation and back out of the player.
-  The player page itself shows the rest of that folder as a **playlist**
-  next to the video; clicking another entry, or letting the current one
-  finish, switches to it in place (swaps the `<video>` source and calls
-  `.play()`) instead of reloading the page — this needs a bit of inline
-  JavaScript, which is why `WatchActivity`'s embedded browser runs with
-  JS enabled.
+  a browsable web page mirroring that folder's actual structure by
+  default — subfolders stay subfolders, navigable one level at a time —
+  so a viewer finds and picks a video the same way they would in a file
+  browser. Each video shows a thumbnail (a frame grabbed a second into
+  the file via `MediaMetadataRetriever`), both in the folder browsing
+  grid and as the player's poster image. A folder with more than one
+  video gets a **Sort** bar (Name / Newest / Largest) that carries
+  through folder navigation and back out of the player.
+- **Per-viewer controls, not host settings**: whether to flatten the
+  folder view into one list, autoplay the next video, and shuffle
+  playback are choices each viewer makes on the page itself — a
+  **View: Folders / All videos** toggle on the browse page, and
+  **Autoplay** / **Shuffle** checkboxes on the player — remembered per
+  browser via `localStorage`, not something the host configures once for
+  everyone. The player page shows the rest of the current folder as a
+  **playlist** next to the video; clicking another entry, letting the
+  current one finish (autoplay), or shuffle picking one at random all
+  switch to it in place (swap the `<video>` source and call `.play()`)
+  instead of reloading the page — this needs a bit of inline JavaScript,
+  which is why `WatchActivity`'s embedded browser runs with JS enabled.
 - **Stay alive**: the server runs inside a foreground `Service`, so
   streaming keeps going even if you switch away from the app (the
   notification shows the URL and has a Stop action).
@@ -74,16 +80,9 @@ VLC can also open the `http://<ip>:8080/video` URL directly.
    500 videos) for playable files.
    A thumbnail preview appears once a single file is picked (folders
    don't get one, since there's no single representative frame).
-   Picking a folder also reveals a few options for how it's served:
-   - **Show all videos in one list** — flattens the folder structure
-     instead of preserving it, so the browse page lists every video at
-     once (each showing its original subfolder as a small caption)
-     instead of navigating into subfolders one at a time.
-   - **Default sort** — Name / Newest / Largest; sets the browse page's
-     initial order (a viewer can still switch it live from the sort bar).
-   - **Autoplay next video** — on by default; controls whether the
-     player automatically advances to the next playlist entry when a
-     video finishes.
+   Picking a folder also reveals **Default sort** (Name / Newest /
+   Largest) — sets the browse page's initial order; any viewer can still
+   switch it live from the sort bar.
 3. Grant the notification permission if prompted (Android 13+).
 4. Tap **Start Streaming**. The screen shows a URL like
    `http://192.168.1.23:8080`.
@@ -91,7 +90,16 @@ VLC can also open the `http://<ip>:8080/video` URL directly.
    above, or VLC's "Open Network Stream"), open that URL. For a folder,
    you'll see it laid out just like on disk — browse into subfolders,
    tap a video to play it, tap "back" to go up a level; for a single
-   file, it starts playing immediately.
+   file, it starts playing immediately. From there, each viewer picks
+   their own experience, remembered for next time:
+   - **View: Folders / All videos** on the browse page — switches
+     between the folder hierarchy and one flat list of every video (each
+     tagged with its original subfolder).
+   - **Autoplay** on the player — advances to the next playlist entry
+     when the current video ends.
+   - **Shuffle** on the player — with Autoplay on, plays through the
+     rest of the playlist in random order (no repeats until everything's
+     played) instead of in sequence.
 
 ### Watching from this app
 

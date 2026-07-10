@@ -13,8 +13,12 @@ import java.util.concurrent.ConcurrentHashMap
  * browser or media player on another device can start playing and seek without
  * downloading the whole file first. In folder mode, `/browse` mirrors the chosen
  * folder's actual directory structure (subfolders navigate further, matching entries'
- * [VideoEntry.folderPath]) rather than flattening everything into one list; a plain
- * single file goes straight to the player.
+ * [VideoEntry.folderPath]) by default; a plain single file goes straight to the player.
+ *
+ * Whether to flatten that structure, autoplay the next video, and whether to shuffle are
+ * all viewer-local choices — controlled by a toggle rendered on the page itself and
+ * remembered per-browser via `localStorage`, rather than something the host configures
+ * once for every viewer.
  */
 class MediaHttpServer(
     port: Int,
@@ -22,12 +26,8 @@ class MediaHttpServer(
     private val entries: List<VideoEntry>,
     private val libraryName: String,
     private val isFolderMode: Boolean,
-    /** When true, `/browse` ignores subfolders entirely and lists every video at once. */
-    private val flattenFolders: Boolean,
     /** One of [SortMode]'s `param` values, used when a request doesn't specify `?sort=`. */
-    private val defaultSortParam: String,
-    /** Whether the player advances to the next playlist entry when a video ends. */
-    private val autoplayNext: Boolean
+    private val defaultSortParam: String
 ) : NanoHTTPD(port) {
 
     // Keyed by VideoEntry.id. An empty array means extraction was already tried and failed,
@@ -62,7 +62,8 @@ class MediaHttpServer(
             "/", "/index.html" -> serveIndex()
             "/browse" -> browsePage(
                 session.parameters["path"]?.firstOrNull().orEmpty(),
-                SortMode.fromParam(session.parameters["sort"]?.firstOrNull() ?: defaultSortParam)
+                SortMode.fromParam(session.parameters["sort"]?.firstOrNull() ?: defaultSortParam),
+                session.parameters["flat"]?.firstOrNull() == "1"
             )
             "/watch" -> serveWatch(session)
             "/video" -> serveVideo(session)
@@ -80,16 +81,19 @@ class MediaHttpServer(
         if (!isFolderMode) {
             val single = entries.singleOrNull()
                 ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "No video available")
-            return watchPage(single, SortMode.NAME)
+            return watchPage(single, SortMode.NAME, flat = false)
         }
-        return browsePage("", SortMode.fromParam(defaultSortParam))
+        // flat=false here is just the request's own starting point — browsePage's inline script
+        // immediately redirects to the viewer's remembered preference if it differs.
+        return browsePage("", SortMode.fromParam(defaultSortParam), flat = false)
     }
 
     private fun serveWatch(session: IHTTPSession): Response {
         val entry = entryFor(session)
             ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Video not found")
         val sortMode = SortMode.fromParam(session.parameters["sort"]?.firstOrNull() ?: defaultSortParam)
-        return watchPage(entry, sortMode)
+        val flat = session.parameters["flat"]?.firstOrNull() == "1"
+        return watchPage(entry, sortMode, flat)
     }
 
     private fun sortVideos(videos: List<VideoEntry>, sortMode: SortMode): List<VideoEntry> = when (sortMode) {
@@ -100,18 +104,20 @@ class MediaHttpServer(
 
     /**
      * Renders the videos and immediate subfolders that live directly inside [path]. When
-     * [flattenFolders] is on, [path] is ignored entirely and every video in the library is
-     * listed together, with its original folder shown as a subtitle for context.
+     * [flat] is on, [path] is ignored entirely and every video in the library is listed
+     * together, with its original folder shown as a subtitle for context. [flat] reflects
+     * only this one request; the page's own script is what keeps it in sync with the
+     * viewer's remembered `localStorage` preference across navigation.
      */
-    private fun browsePage(path: String, sortMode: SortMode): Response {
-        val effectivePath = if (flattenFolders) "" else path
+    private fun browsePage(path: String, sortMode: SortMode, flat: Boolean): Response {
+        val effectivePath = if (flat) "" else path
         val prefix = if (effectivePath.isEmpty()) "" else "$effectivePath/"
-        val videos = if (flattenFolders) {
+        val videos = if (flat) {
             sortVideos(entries, sortMode)
         } else {
             sortVideos(entries.filter { it.folderPath == effectivePath }, sortMode)
         }
-        val subfolders = if (flattenFolders) {
+        val subfolders = if (flat) {
             emptyList()
         } else {
             entries
@@ -137,14 +143,14 @@ class MediaHttpServer(
             "<li><a href=\"/browse?path=${encodePath(childPath)}&sort=${sortMode.param}\">&#128193; ${escapeHtml(folderName)}</a></li>"
         }
         val videoItems = videos.joinToString("\n") { entry ->
-            val subtitle = if (flattenFolders && entry.folderPath.isNotEmpty()) {
+            val subtitle = if (flat && entry.folderPath.isNotEmpty()) {
                 "<small>${escapeHtml(entry.folderPath)}</small>"
             } else {
                 ""
             }
             """
             <li>
-              <a href="/watch?id=${entry.id}&sort=${sortMode.param}">
+              <a href="/watch?id=${entry.id}&sort=${sortMode.param}&flat=${if (flat) "1" else "0"}">
                 <img src="/thumbnail?id=${entry.id}" loading="lazy" alt="">
                 <span>${escapeHtml(entry.name)}</span>
                 $subtitle
@@ -156,11 +162,29 @@ class MediaHttpServer(
             if (mode == sortMode) {
                 "<span class=\"active\">${mode.label}</span>"
             } else {
-                "<a href=\"/browse?path=${encodePath(effectivePath)}&sort=${mode.param}\">${mode.label}</a>"
+                "<a href=\"/browse?path=${encodePath(effectivePath)}&sort=${mode.param}&flat=${if (flat) "1" else "0"}\">${mode.label}</a>"
             }
         }
         val sortBar = if (videos.size > 1) {
-            "<div class=\"sortbar\"><span class=\"label\">Sort:</span> $sortLinks</div>"
+            "<div class=\"bar\"><span class=\"label\">Sort:</span> $sortLinks</div>"
+        } else {
+            ""
+        }
+        // Only worth offering when the library actually has subfolders — otherwise the two
+        // modes would look identical.
+        val hasSubfolderSomewhere = entries.any { it.folderPath.isNotEmpty() }
+        val viewBar = if (hasSubfolderSomewhere) {
+            val foldersOption = if (!flat) {
+                "<span class=\"active\">Folders</span>"
+            } else {
+                "<a href=\"/browse?path=${encodePath("")}&sort=${sortMode.param}&flat=0\">Folders</a>"
+            }
+            val flatOption = if (flat) {
+                "<span class=\"active\">All videos</span>"
+            } else {
+                "<a href=\"/browse?path=${encodePath("")}&sort=${sortMode.param}&flat=1\">All videos</a>"
+            }
+            "<div class=\"bar\"><span class=\"label\">View:</span> $foldersOption $flatOption</div>"
         } else {
             ""
         }
@@ -169,17 +193,33 @@ class MediaHttpServer(
             <!DOCTYPE html>
             <html>
             <head>
+              <script>
+              // Runs before anything renders: if this device has a remembered flat/folder
+              // preference that the URL doesn't already reflect, jump straight to it instead
+              // of showing the "wrong" layout for a moment.
+              (function () {
+                var params = new URLSearchParams(location.search);
+                if (params.get('flat') === null) {
+                  if (localStorage.getItem('flatView') === '1') {
+                    params.set('flat', '1');
+                    location.replace(location.pathname + '?' + params.toString());
+                  }
+                } else {
+                  localStorage.setItem('flatView', params.get('flat'));
+                }
+              })();
+              </script>
               <meta charset="utf-8">
               <meta name="viewport" content="width=device-width, initial-scale=1">
               <title>${escapeHtml(title)}</title>
               <style>
                 body { margin: 0; padding: 24px; background: #111; color: #eee; font-family: sans-serif; }
                 h1 { font-size: 20px; }
-                .sortbar { margin: 0 0 16px; font-size: 13px; }
-                .sortbar .label { color: #888; margin-right: 8px; }
-                .sortbar a, .sortbar .active { margin-right: 12px; text-decoration: none; }
-                .sortbar a { color: #9cf; }
-                .sortbar .active { color: #fff; font-weight: bold; }
+                .bar { margin: 0 0 16px; font-size: 13px; }
+                .bar .label { color: #888; margin-right: 8px; }
+                .bar a, .bar .active { margin-right: 12px; text-decoration: none; }
+                .bar a { color: #9cf; }
+                .bar .active { color: #fff; font-weight: bold; }
                 ul.folders { list-style: none; padding: 0; margin: 0 0 16px; }
                 ul.folders li { margin: 4px 0; }
                 ul.folders a { display: block; padding: 12px 16px; background: #222; color: #fff; text-decoration: none; border-radius: 8px; }
@@ -194,6 +234,7 @@ class MediaHttpServer(
             </head>
             <body>
               <h1>${escapeHtml(title)}</h1>
+              $viewBar
               <ul class="folders">
                 $backLink
                 $folderItems
@@ -208,20 +249,20 @@ class MediaHttpServer(
         return newFixedLengthResponse(Response.Status.OK, "text/html", html)
     }
 
-    private fun watchPage(entry: VideoEntry, sortMode: SortMode): Response {
+    private fun watchPage(entry: VideoEntry, sortMode: SortMode, flat: Boolean): Response {
         // The playlist is the other videos alongside this one — the same folder, or the whole
-        // library when folders are flattened — same scope the browse page would show, in the
-        // same sort order.
+        // library when viewing flat — same scope the browse page would show, in the same sort
+        // order.
         val siblings = when {
             !isFolderMode -> listOf(entry)
-            flattenFolders -> sortVideos(entries, sortMode)
+            flat -> sortVideos(entries, sortMode)
             else -> sortVideos(entries.filter { it.folderPath == entry.folderPath }, sortMode)
         }
         val showPlaylist = isFolderMode && siblings.size > 1
 
         val backLink = if (isFolderMode) {
-            val backPath = if (flattenFolders) "" else entry.folderPath
-            "<a class=\"back\" href=\"/browse?path=${encodePath(backPath)}&sort=${sortMode.param}\">&larr; Back</a>"
+            val backPath = if (flat) "" else entry.folderPath
+            "<a class=\"back\" href=\"/browse?path=${encodePath(backPath)}&sort=${sortMode.param}&flat=${if (flat) "1" else "0"}\">&larr; Back</a>"
         } else {
             ""
         }
@@ -235,6 +276,16 @@ class MediaHttpServer(
             """.trimIndent()
         }
         val playlistJson = siblings.joinToString(",") { item -> "{\"id\":${item.id},\"name\":${jsonString(item.name)}}" }
+        val controls = if (showPlaylist) {
+            """
+            <div class="controls">
+              <label class="toggle"><input type="checkbox" id="autoplayToggle"> Autoplay</label>
+              <label class="toggle"><input type="checkbox" id="shuffleToggle"> Shuffle</label>
+            </div>
+            """.trimIndent()
+        } else {
+            ""
+        }
 
         val html = """
             <!DOCTYPE html>
@@ -246,9 +297,11 @@ class MediaHttpServer(
               <style>
                 html, body { margin: 0; height: 100%; background: #111; color: #eee; font-family: sans-serif; }
                 body { display: flex; flex-direction: column; }
-                .topbar { display: flex; align-items: center; gap: 16px; padding: 10px 16px; flex-shrink: 0; }
+                .topbar { display: flex; align-items: center; gap: 16px; padding: 10px 16px; flex-shrink: 0; flex-wrap: wrap; }
                 .back { color: #9cf; text-decoration: none; flex-shrink: 0; }
                 #currentTitle { font-size: 14px; color: #ccc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                .controls { display: flex; gap: 12px; margin-left: auto; }
+                .toggle { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #ccc; white-space: nowrap; }
                 .main { flex: 1; display: flex; min-height: 0; }
                 .player { flex: 1; display: flex; align-items: center; justify-content: center; background: #000; min-width: 0; }
                 video { max-width: 100%; max-height: 100%; }
@@ -268,6 +321,7 @@ class MediaHttpServer(
               <div class="topbar">
                 $backLink
                 <span id="currentTitle">${escapeHtml(entry.name)}</span>
+                $controls
               </div>
               <div class="main">
                 <div class="player">
@@ -279,16 +333,68 @@ class MediaHttpServer(
               (function () {
                 var playlist = [$playlistJson];
                 var currentId = ${entry.id};
-                var autoplayNext = ${autoplayNext};
                 var video = document.getElementById('player');
                 var titleEl = document.getElementById('currentTitle');
                 var listEl = document.getElementById('playlist');
+                var autoplayCheckbox = document.getElementById('autoplayToggle');
+                var shuffleCheckbox = document.getElementById('shuffleToggle');
+                var shuffleQueue = [];
+
+                function loadPref(key, defaultValue) {
+                  var v = localStorage.getItem(key);
+                  return v === null ? defaultValue : v === '1';
+                }
+                function savePref(key, value) {
+                  localStorage.setItem(key, value ? '1' : '0');
+                }
+
+                var autoplayNext = loadPref('autoplayNext', true);
+                var shuffleMode = loadPref('shuffleMode', false);
+                if (autoplayCheckbox) {
+                  autoplayCheckbox.checked = autoplayNext;
+                  autoplayCheckbox.addEventListener('change', function () {
+                    autoplayNext = autoplayCheckbox.checked;
+                    savePref('autoplayNext', autoplayNext);
+                  });
+                }
+                if (shuffleCheckbox) {
+                  shuffleCheckbox.checked = shuffleMode;
+                  shuffleCheckbox.addEventListener('change', function () {
+                    shuffleMode = shuffleCheckbox.checked;
+                    savePref('shuffleMode', shuffleMode);
+                    shuffleQueue = [];
+                  });
+                }
 
                 function indexOf(id) {
                   for (var i = 0; i < playlist.length; i++) {
                     if (playlist[i].id === id) return i;
                   }
                   return -1;
+                }
+
+                // A shuffle bag: play through every other video once, in random order, before
+                // any repeat, instead of picking independently at random each time (which can
+                // repeat the same video several times before covering the rest).
+                function refillShuffleQueue(excludeId) {
+                  var ids = [];
+                  for (var i = 0; i < playlist.length; i++) {
+                    if (playlist[i].id !== excludeId) ids.push(playlist[i].id);
+                  }
+                  for (var i = ids.length - 1; i > 0; i--) {
+                    var j = Math.floor(Math.random() * (i + 1));
+                    var tmp = ids[i]; ids[i] = ids[j]; ids[j] = tmp;
+                  }
+                  shuffleQueue = ids;
+                }
+
+                function nextIdForAutoplay() {
+                  if (shuffleMode) {
+                    if (shuffleQueue.length === 0) refillShuffleQueue(currentId);
+                    return shuffleQueue.length > 0 ? shuffleQueue.shift() : null;
+                  }
+                  var idx = indexOf(currentId);
+                  return (idx >= 0 && idx + 1 < playlist.length) ? playlist[idx + 1].id : null;
                 }
 
                 function playItem(id, pushHistory) {
@@ -302,7 +408,11 @@ class MediaHttpServer(
                   titleEl.textContent = item.name;
                   document.title = item.name;
                   if (pushHistory !== false && window.history && window.history.pushState) {
-                    window.history.pushState({ id: id }, '', '/watch?id=' + id + '&sort=${sortMode.param}');
+                    window.history.pushState(
+                      { id: id },
+                      '',
+                      '/watch?id=' + id + '&sort=${sortMode.param}&flat=${if (flat) "1" else "0"}'
+                    );
                   }
                   if (listEl) {
                     var nodes = listEl.querySelectorAll('li');
@@ -324,10 +434,8 @@ class MediaHttpServer(
 
                 video.addEventListener('ended', function () {
                   if (!autoplayNext) return;
-                  var idx = indexOf(currentId);
-                  if (idx >= 0 && idx + 1 < playlist.length) {
-                    playItem(playlist[idx + 1].id, true);
-                  }
+                  var nextId = nextIdForAutoplay();
+                  if (nextId !== null) playItem(nextId, true);
                 });
 
                 // Keeps the player in sync when the user navigates back/forward through the

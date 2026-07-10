@@ -125,11 +125,9 @@ class HostActivity : AppCompatActivity() {
         setFolderOptionsVisible(true)
     }
 
-    /** Flattening and default sort only make sense once there's a folder (with subfolders) to browse. */
+    /** The default-sort picker only makes sense once there's a folder of videos to sort. */
     private fun setFolderOptionsVisible(visible: Boolean) {
-        val visibility = if (visible) View.VISIBLE else View.GONE
-        binding.flattenSwitch.visibility = visibility
-        binding.sortOptionRow.visibility = visibility
+        binding.sortOptionRow.visibility = if (visible) View.VISIBLE else View.GONE
     }
 
     /** Folders don't have a single representative thumbnail, so this only applies to single-file mode. */
@@ -216,10 +214,8 @@ class HostActivity : AppCompatActivity() {
         val intent = Intent(this, StreamingService::class.java).apply {
             action = StreamingService.ACTION_START
             putExtra(StreamingService.EXTRA_VIDEO_NAME, selectedName)
-            putExtra(StreamingService.EXTRA_AUTOPLAY_NEXT, binding.autoplaySwitch.isChecked)
             if (selectedIsFolder) {
                 putExtra(StreamingService.EXTRA_FOLDER_URI, uri.toString())
-                putExtra(StreamingService.EXTRA_FLATTEN, binding.flattenSwitch.isChecked)
                 putExtra(
                     StreamingService.EXTRA_DEFAULT_SORT,
                     SORT_VALUES.getOrElse(binding.defaultSortSpinner.selectedItemPosition) {

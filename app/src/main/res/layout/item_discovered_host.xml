@@ -1,28 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="?attr/selectableItemBackground"
     android:clickable="true"
     android:focusable="true"
-    android:orientation="vertical"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
     android:padding="12dp">
 
-    <TextView
-        android:id="@+id/hostName"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:textSize="15sp"
-        android:textStyle="bold"
-        tools:text="Living Room Videos (Pixel 7)" />
+    <ImageView
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_marginEnd="12dp"
+        android:contentDescription="@null"
+        android:src="@drawable/ic_videocam"
+        app:tint="?attr/colorPrimary" />
 
-    <TextView
-        android:id="@+id/hostAddress"
-        android:layout_width="match_parent"
+    <LinearLayout
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:textColor="?android:attr/textColorSecondary"
-        android:textSize="12sp"
-        tools:text="192.168.1.23:8080" />
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/hostName"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="15sp"
+            android:textStyle="bold"
+            tools:text="Living Room Videos (Pixel 7)" />
+
+        <TextView
+            android:id="@+id/hostAddress"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="12sp"
+            tools:text="192.168.1.23:8080" />
+
+    </LinearLayout>
 
 </LinearLayout>

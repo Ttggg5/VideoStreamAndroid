@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Local Video Stream</string>
+    <string name="app_tagline">Stream video across your local network — no internet needed</string>
 
     <string name="host_a_video">Host a Video</string>
+    <string name="host_a_video_subtitle">Pick a video or folder and share it on this network</string>
     <string name="watch_a_stream">Watch a Stream</string>
+    <string name="watch_a_stream_subtitle">Find and watch a stream someone else is hosting</string>
 
     <string name="choose_video">Choose Video File</string>
     <string name="choose_folder">Choose Folder</string>

@@ -54,6 +54,15 @@ class MediaHttpServer(
         }.toMap()
     }
 
+    // Small inline SVGs used across the browse/watch pages instead of emoji, so icons render
+    // identically regardless of the viewing device's font/emoji set.
+    private val folderIconSvg =
+        "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z\"/></svg>"
+    private val chevronLeftIconSvg =
+        "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M15 6l-6 6 6 6\"/></svg>"
+    private val playBadgeIconSvg =
+        "<svg width=\"36\" height=\"36\" viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"10\" fill=\"rgba(0,0,0,0.55)\"/><path d=\"M10 8l6 4-6 4z\" fill=\"#fff\"/></svg>"
+
     /** Closes the underlying [ParcelFileDescriptor] together with the stream view over it. */
     private class ClosingFileInputStream(private val pfd: ParcelFileDescriptor) :
         FileInputStream(pfd.fileDescriptor) {
@@ -183,13 +192,13 @@ class MediaHttpServer(
         val title = if (effectivePath.isEmpty()) libraryName else effectivePath.substringAfterLast('/')
         val backLink = if (effectivePath.isNotEmpty()) {
             val parentPath = effectivePath.substringBeforeLast('/', "")
-            "<li><a href=\"/browse?path=${encodePath(parentPath)}&sort=${sortMode.param}\">&larr; ..</a></li>"
+            "<li><a class=\"back\" href=\"/browse?path=${encodePath(parentPath)}&sort=${sortMode.param}\">$chevronLeftIconSvg ..</a></li>"
         } else {
             ""
         }
         val folderItems = subfolders.joinToString("\n") { folderName ->
             val childPath = if (effectivePath.isEmpty()) folderName else "$effectivePath/$folderName"
-            "<li><a href=\"/browse?path=${encodePath(childPath)}&sort=${sortMode.param}\">&#128193; ${escapeHtml(folderName)}</a></li>"
+            "<li><a href=\"/browse?path=${encodePath(childPath)}&sort=${sortMode.param}\">$folderIconSvg ${escapeHtml(folderName)}</a></li>"
         }
         val videoItems = videos.joinToString("\n") { entry ->
             val subtitle = if (flat && entry.folderPath.isNotEmpty()) {
@@ -200,8 +209,11 @@ class MediaHttpServer(
             """
             <li>
               <a href="/watch?id=${entry.id}&sort=${sortMode.param}&flat=${if (flat) "1" else "0"}">
-                <img src="/thumbnail?id=${entry.id}" loading="lazy" alt="">
-                <span>${escapeHtml(entry.name)}</span>
+                <span class="thumb">
+                  <img src="/thumbnail?id=${entry.id}" loading="lazy" alt="">
+                  <span class="play-badge">$playBadgeIconSvg</span>
+                </span>
+                <span class="title">${escapeHtml(entry.name)}</span>
                 $subtitle
               </a>
             </li>
@@ -262,23 +274,47 @@ class MediaHttpServer(
               <meta name="viewport" content="width=device-width, initial-scale=1">
               <title>${escapeHtml(title)}</title>
               <style>
-                body { margin: 0; padding: 24px; background: #111; color: #eee; font-family: sans-serif; }
-                h1 { font-size: 20px; }
-                .bar { margin: 0 0 16px; font-size: 13px; }
-                .bar .label { color: #888; margin-right: 8px; }
-                .bar a, .bar .active { margin-right: 12px; text-decoration: none; }
-                .bar a { color: #9cf; }
-                .bar .active { color: #fff; font-weight: bold; }
+                :root { --accent: #4a5fff; }
+                * { box-sizing: border-box; }
+                body {
+                  margin: 0; padding: 24px; background: #111319; color: #eee;
+                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                }
+                h1 { font-size: 21px; margin: 0 0 16px; letter-spacing: -0.01em; }
+                .bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; font-size: 13px; }
+                .bar .label { color: #888; margin-right: 2px; }
+                .bar a, .bar .active {
+                  padding: 6px 14px; border-radius: 999px; text-decoration: none; font-size: 13px;
+                }
+                .bar a { color: #ccc; background: #1c1f28; }
+                .bar a:hover { background: #262a36; }
+                .bar .active { background: var(--accent); color: #fff; font-weight: 600; }
                 ul.folders { list-style: none; padding: 0; margin: 0 0 16px; }
-                ul.folders li { margin: 4px 0; }
-                ul.folders a { display: block; padding: 12px 16px; background: #222; color: #fff; text-decoration: none; border-radius: 8px; }
-                ul.folders a:hover { background: #333; }
-                ul.videos { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
-                ul.videos a { display: flex; flex-direction: column; background: #222; color: #fff; text-decoration: none; border-radius: 8px; overflow: hidden; }
-                ul.videos a:hover { background: #333; }
-                ul.videos img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #000; }
-                ul.videos span { padding: 8px; font-size: 13px; word-break: break-word; }
-                ul.videos small { padding: 0 8px 8px; margin-top: -8px; color: #888; font-size: 11px; word-break: break-word; }
+                ul.folders li { margin: 6px 0; }
+                ul.folders a {
+                  display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+                  background: #1c1f28; color: #fff; text-decoration: none; border-radius: 12px;
+                  transition: background 0.15s ease;
+                }
+                ul.folders a:hover { background: #262a36; }
+                ul.folders a.back { color: #ccc; }
+                ul.videos {
+                  list-style: none; padding: 0; margin: 0; display: grid;
+                  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px;
+                }
+                ul.videos a {
+                  display: flex; flex-direction: column; background: #1c1f28; color: #fff;
+                  text-decoration: none; border-radius: 12px; overflow: hidden;
+                  transition: transform 0.15s ease, background 0.15s ease;
+                }
+                ul.videos a:hover { background: #262a36; transform: translateY(-2px); }
+                ul.videos .thumb { display: block; position: relative; background: #000; }
+                ul.videos .thumb img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+                ul.videos .play-badge {
+                  position: absolute; right: 6px; bottom: 6px; display: flex; opacity: 0.9;
+                }
+                ul.videos .title { display: block; padding: 8px; font-size: 13px; word-break: break-word; }
+                ul.videos small { display: block; padding: 0 8px 8px; margin-top: -8px; color: #888; font-size: 11px; word-break: break-word; }
               </style>
             </head>
             <body>
@@ -311,7 +347,7 @@ class MediaHttpServer(
 
         val backLink = if (isFolderMode) {
             val backPath = if (flat) "" else entry.folderPath
-            "<a class=\"back\" href=\"/browse?path=${encodePath(backPath)}&sort=${sortMode.param}&flat=${if (flat) "1" else "0"}\">&larr; Back</a>"
+            "<a class=\"back\" href=\"/browse?path=${encodePath(backPath)}&sort=${sortMode.param}&flat=${if (flat) "1" else "0"}\">$chevronLeftIconSvg Back</a>"
         } else {
             ""
         }
@@ -357,13 +393,22 @@ class MediaHttpServer(
               <title>${escapeHtml(entry.name)}</title>
               <link href="/assets/videojs/video-js.min.css" rel="stylesheet">
               <style>
-                html, body { margin: 0; height: 100%; background: #111; color: #eee; font-family: sans-serif; }
+                :root { --accent: #4a5fff; }
+                * { box-sizing: border-box; }
+                html, body {
+                  margin: 0; height: 100%; background: #111319; color: #eee;
+                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                }
                 body { display: flex; flex-direction: column; }
                 .topbar { display: flex; align-items: center; gap: 16px; padding: 10px 16px; flex-shrink: 0; flex-wrap: wrap; }
-                .back { color: #9cf; text-decoration: none; flex-shrink: 0; }
+                .back { display: flex; align-items: center; gap: 4px; color: #9db0ff; text-decoration: none; flex-shrink: 0; }
                 #currentTitle { font-size: 14px; color: #ccc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
                 .controls { display: flex; gap: 12px; align-items: center; margin-left: auto; }
-                .toggle { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #ccc; white-space: nowrap; }
+                .toggle {
+                  display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
+                  background: #1c1f28; font-size: 12px; color: #ccc; white-space: nowrap; cursor: pointer;
+                }
+                .toggle:has(input:checked) { background: var(--accent); color: #fff; }
                 .main { flex: 1; display: flex; min-height: 0; }
                 .player { flex: 1; position: relative; background: #000; min-width: 0; }
                 .video-js { width: 100%; height: 100%; }
@@ -391,10 +436,10 @@ class MediaHttpServer(
                 .navPrev { left: 12px; }
                 .navNext { right: 12px; }
                 .playlist { width: 280px; flex-shrink: 0; overflow-y: auto; border-left: 1px solid #222; list-style: none; margin: 0; padding: 0; }
-                .playlist li { display: flex; gap: 8px; align-items: center; padding: 8px; cursor: pointer; }
-                .playlist li:hover { background: #1a1a1a; }
-                .playlist li.active { background: #232323; box-shadow: inset 3px 0 0 #9cf; }
-                .playlist img { width: 72px; aspect-ratio: 16 / 9; object-fit: cover; background: #000; border-radius: 4px; flex-shrink: 0; }
+                .playlist li { display: flex; gap: 10px; align-items: center; padding: 8px 12px; cursor: pointer; border-radius: 10px; margin: 4px 6px; }
+                .playlist li:hover { background: #1c1f28; }
+                .playlist li.active { background: #1c1f28; box-shadow: inset 3px 0 0 var(--accent); }
+                .playlist img { width: 72px; aspect-ratio: 16 / 9; object-fit: cover; background: #000; border-radius: 8px; flex-shrink: 0; }
                 .playlist span { font-size: 12px; word-break: break-word; }
                 @media (max-width: 700px) {
                   .main { flex-direction: column; }

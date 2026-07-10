@@ -145,7 +145,35 @@ app/src/main/java/com/videostream/local/
   NetworkUtils.kt          Finds the device's local IPv4 address
 app/src/main/assets/videojs/
   video.min.js, video-js.min.css   Bundled video.js player (Apache-2.0), served at /assets/videojs/...
+app/src/test/java/com/videostream/local/
+  MediaHttpServerTest.kt   Starts a real MediaHttpServer on a loopback port and hits it with HTTP requests
+  NetworkUtilsTest.kt      Sanity-checks getLocalIpAddress()'s return shape
 ```
+
+## Testing
+
+`app/src/test/` holds JVM unit tests, run with `gradle testDebugUnitTest`
+(also part of CI, see below):
+
+- **`MediaHttpServerTest`** starts a real `MediaHttpServer` bound to an
+  ephemeral loopback port and issues actual HTTP requests against it —
+  NanoHTTPD itself has no Android dependency, so this runs as a plain JVM
+  test. The only Android framework types involved (`ContentResolver`,
+  `AssetManager`, `Uri`) are mocked with Mockito rather than touched for
+  real. Covers: HTML-escaping video/folder names (so a filename can't
+  inject markup into the page), Sort ordering, folder-structure
+  navigation, single-file vs. folder mode, and that missing
+  files/videos come back as a clean 404/500 instead of crashing the
+  server.
+- **`NetworkUtilsTest`** checks that `getLocalIpAddress()` never throws
+  and that whatever it returns (if anything — this depends on the
+  machine's actual network interfaces) looks like a real, non-loopback,
+  non-link-local IPv4 address.
+
+Activities and the foreground service aren't covered here — they're
+thin, Android-lifecycle-heavy wrappers around the tested logic above,
+and meaningfully testing them would need Robolectric or instrumented
+(on-device) tests rather than plain JVM unit tests.
 
 ## Third-party
 

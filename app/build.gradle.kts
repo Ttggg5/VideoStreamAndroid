@@ -55,6 +55,15 @@ android {
     buildFeatures {
         viewBinding = true
     }
+
+    testOptions {
+        unitTests {
+            // MediaHttpServerTest mocks ContentResolver/AssetManager/Uri with Mockito rather
+            // than calling them for real, but this keeps any accidental un-mocked Android call
+            // from hard-crashing the test with "not mocked" instead of just returning a default.
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 dependencies {
@@ -67,4 +76,7 @@ dependencies {
     implementation("androidx.documentfile:documentfile:1.0.1")
 
     implementation("org.nanohttpd:nanohttpd:2.3.1")
+
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.mockito:mockito-core:5.12.0")
 }

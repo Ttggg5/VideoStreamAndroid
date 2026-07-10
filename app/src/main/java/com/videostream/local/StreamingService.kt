@@ -152,7 +152,7 @@ class StreamingService : Service() {
         }
 
         val httpServer = MediaHttpServer(
-            HTTP_PORT, contentResolver, entries, libraryLabel, isFolderMode, defaultSort
+            HTTP_PORT, contentResolver, assets, entries, libraryLabel, isFolderMode, defaultSort
         )
         try {
             httpServer.start(NANOHTTPD_TIMEOUT_MS, false)

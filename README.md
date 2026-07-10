@@ -28,6 +28,10 @@ with a built-in screen to open another device's stream.
   grid and as the player's poster image. A folder with more than one
   video gets a **Sort** bar (Name / Newest / Largest) that carries
   through folder navigation and back out of the player.
+- **Player**: the actual player is [video.js](https://videojs.com), bundled
+  under `assets/videojs/` and served from `/assets/...` so it works with
+  no internet access on the viewing device, same as everything else this
+  server serves — no CDN dependency.
 - **Per-viewer controls, not host settings**: whether to flatten the
   folder view into one list, autoplay the next video, and shuffle
   playback are choices each viewer makes on the page itself — a
@@ -39,7 +43,7 @@ with a built-in screen to open another device's stream.
   overlaid on the video itself (left/right edges, like a typical media
   player); clicking another entry, pressing Prev/Next, letting the
   current one finish (autoplay), or shuffle picking one at random all
-  switch to it in place (swap the `<video>` source and call `.play()`)
+  switch to it in place (swap the player's source and call `.play()`)
   instead of reloading the page — this needs a bit of inline JavaScript,
   which is why `WatchActivity`'s embedded browser runs with JS enabled.
   Next follows shuffle order when Shuffle is on; Prev retraces actual
@@ -139,7 +143,17 @@ app/src/main/java/com/videostream/local/
   ThumbnailUtil.kt         Extracts a downscaled JPEG preview frame from a video, used by both the server and HostActivity
   VideoEntry.kt            One playable video (id, display name, folder path, content Uri, size/date for sorting)
   NetworkUtils.kt          Finds the device's local IPv4 address
+app/src/main/assets/videojs/
+  video.min.js, video-js.min.css   Bundled video.js player (Apache-2.0), served at /assets/videojs/...
 ```
+
+## Third-party
+
+The player on `/watch` pages is [video.js](https://videojs.com)
+(Apache License 2.0), bundled directly in the app under
+`app/src/main/assets/videojs/` — see `LICENSE` alongside it — rather than
+loaded from a CDN, so playback doesn't depend on the viewing device
+having internet access.
 
 ## CI/CD
 

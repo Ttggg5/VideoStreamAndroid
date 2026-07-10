@@ -1,6 +1,7 @@
 package com.videostream.local
 
 import android.content.ContentResolver
+import android.content.res.AssetManager
 import android.os.ParcelFileDescriptor
 import fi.iki.elonen.NanoHTTPD
 import java.io.ByteArrayInputStream
@@ -19,10 +20,15 @@ import java.util.concurrent.ConcurrentHashMap
  * all viewer-local choices — controlled by a toggle rendered on the page itself and
  * remembered per-browser via `localStorage`, rather than something the host configures
  * once for every viewer.
+ *
+ * The player itself is [video.js](https://videojs.com), bundled under `assets/videojs/`
+ * and served from `/assets/...` so playback works with no internet access — same as
+ * everything else this server serves.
  */
 class MediaHttpServer(
     port: Int,
     private val contentResolver: ContentResolver,
+    private val assetManager: AssetManager,
     private val entries: List<VideoEntry>,
     private val libraryName: String,
     private val isFolderMode: Boolean,
@@ -33,6 +39,20 @@ class MediaHttpServer(
     // Keyed by VideoEntry.id. An empty array means extraction was already tried and failed,
     // so a broken/DRM'd file isn't re-decoded on every thumbnail request.
     private val thumbnailCache = ConcurrentHashMap<Int, ByteArray>()
+
+    /** The video.js JS/CSS bundle, read once from assets and served from memory. */
+    private val bundledAssets: Map<String, Pair<String, ByteArray>> by lazy {
+        listOf(
+            "videojs/video.min.js" to "application/javascript",
+            "videojs/video-js.min.css" to "text/css"
+        ).mapNotNull { (path, mime) ->
+            try {
+                path to (mime to assetManager.open(path).use { it.readBytes() })
+            } catch (e: Exception) {
+                null
+            }
+        }.toMap()
+    }
 
     /** Closes the underlying [ParcelFileDescriptor] together with the stream view over it. */
     private class ClosingFileInputStream(private val pfd: ParcelFileDescriptor) :
@@ -58,6 +78,9 @@ class MediaHttpServer(
     }
 
     override fun serve(session: IHTTPSession): Response {
+        if (session.uri.startsWith("/assets/")) {
+            return serveAsset(session.uri.removePrefix("/assets/"))
+        }
         return when (session.uri) {
             "/", "/index.html" -> serveIndex()
             "/browse" -> browsePage(
@@ -70,6 +93,12 @@ class MediaHttpServer(
             "/thumbnail" -> serveThumbnail(session)
             else -> newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Not found")
         }
+    }
+
+    private fun serveAsset(assetPath: String): Response {
+        val (mimeType, bytes) = bundledAssets[assetPath]
+            ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Not found")
+        return newFixedLengthResponse(Response.Status.OK, mimeType, ByteArrayInputStream(bytes), bytes.size.toLong())
     }
 
     private fun entryFor(session: IHTTPSession): VideoEntry? {
@@ -100,6 +129,26 @@ class MediaHttpServer(
         SortMode.NAME -> videos.sortedBy { it.name.lowercase() }
         SortMode.DATE -> videos.sortedByDescending { it.lastModified }
         SortMode.SIZE -> videos.sortedByDescending { it.sizeBytes }
+    }
+
+    /**
+     * Guesses a video's MIME type from its file extension, for the `<source type>` hint
+     * video.js uses to pick a playback source — the actual `/video` response's real
+     * `Content-Type` header (from [ContentResolver.getType]) is what ultimately governs
+     * playback, this is just advisory since `/video?id=…` URLs have no extension of their own.
+     */
+    private fun guessVideoMimeType(name: String): String = when (name.substringAfterLast('.', "").lowercase()) {
+        "mp4", "m4v" -> "video/mp4"
+        "webm" -> "video/webm"
+        "mkv" -> "video/x-matroska"
+        "mov" -> "video/quicktime"
+        "avi" -> "video/x-msvideo"
+        "3gp" -> "video/3gpp"
+        "ts" -> "video/mp2t"
+        "flv" -> "video/x-flv"
+        "wmv" -> "video/x-ms-wmv"
+        "mpg", "mpeg" -> "video/mpeg"
+        else -> "video/mp4"
     }
 
     /**
@@ -275,7 +324,9 @@ class MediaHttpServer(
             </li>
             """.trimIndent()
         }
-        val playlistJson = siblings.joinToString(",") { item -> "{\"id\":${item.id},\"name\":${jsonString(item.name)}}" }
+        val playlistJson = siblings.joinToString(",") { item ->
+            "{\"id\":${item.id},\"name\":${jsonString(item.name)},\"type\":${jsonString(guessVideoMimeType(item.name))}}"
+        }
         val controls = if (showPlaylist) {
             """
             <div class="controls">
@@ -304,6 +355,7 @@ class MediaHttpServer(
               <meta charset="utf-8">
               <meta name="viewport" content="width=device-width, initial-scale=1">
               <title>${escapeHtml(entry.name)}</title>
+              <link href="/assets/videojs/video-js.min.css" rel="stylesheet">
               <style>
                 html, body { margin: 0; height: 100%; background: #111; color: #eee; font-family: sans-serif; }
                 body { display: flex; flex-direction: column; }
@@ -313,8 +365,9 @@ class MediaHttpServer(
                 .controls { display: flex; gap: 12px; align-items: center; margin-left: auto; }
                 .toggle { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #ccc; white-space: nowrap; }
                 .main { flex: 1; display: flex; min-height: 0; }
-                .player { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; background: #000; min-width: 0; }
-                video { max-width: 100%; max-height: 100%; }
+                .player { flex: 1; position: relative; background: #000; min-width: 0; }
+                .video-js { width: 100%; height: 100%; }
+                .video-js .vjs-tech { object-fit: contain; }
                 .navOverlayBtn {
                   position: absolute;
                   top: 50%;
@@ -358,16 +411,19 @@ class MediaHttpServer(
               <div class="main">
                 <div class="player">
                   $prevOverlayButton
-                  <video id="player" controls autoplay poster="/thumbnail?id=${entry.id}" src="/video?id=${entry.id}"></video>
+                  <video id="player" class="video-js vjs-big-play-centered" controls preload="auto" poster="/thumbnail?id=${entry.id}">
+                    <source src="/video?id=${entry.id}" type="${guessVideoMimeType(entry.name)}">
+                  </video>
                   $nextOverlayButton
                 </div>
                 ${if (showPlaylist) "<ul class=\"playlist\" id=\"playlist\">$playlistItems</ul>" else ""}
               </div>
+              <script src="/assets/videojs/video.min.js"></script>
               <script>
               (function () {
                 var playlist = [$playlistJson];
                 var currentId = ${entry.id};
-                var video = document.getElementById('player');
+                var player = videojs('player', { autoplay: true });
                 var titleEl = document.getElementById('currentTitle');
                 var listEl = document.getElementById('playlist');
                 var autoplayCheckbox = document.getElementById('autoplayToggle');
@@ -443,10 +499,9 @@ class MediaHttpServer(
                   if (!item) return;
                   if (trackHistory !== false && currentId !== id) playHistory.push(currentId);
                   currentId = id;
-                  video.src = '/video?id=' + id;
-                  video.poster = '/thumbnail?id=' + id;
-                  video.load();
-                  video.play().catch(function () {});
+                  player.poster('/thumbnail?id=' + id);
+                  player.src({ src: '/video?id=' + id, type: item.type });
+                  player.play().catch(function () {});
                   titleEl.textContent = item.name;
                   document.title = item.name;
                   if (pushHistory !== false && window.history && window.history.pushState) {
@@ -498,7 +553,7 @@ class MediaHttpServer(
                   });
                 }
 
-                video.addEventListener('ended', function () {
+                player.on('ended', function () {
                   if (!autoplayNext) return;
                   goNext();
                 });

@@ -8,6 +8,8 @@ import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.net.Uri
+import android.net.nsd.NsdManager
+import android.net.nsd.NsdServiceInfo
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
@@ -38,6 +40,8 @@ class StreamingService : Service() {
 
     private var server: MediaHttpServer? = null
     private var wakeLock: PowerManager.WakeLock? = null
+    private var nsdManager: NsdManager? = null
+    private var nsdRegistrationListener: NsdManager.RegistrationListener? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -168,9 +172,16 @@ class StreamingService : Service() {
             if (url != null) getString(R.string.notification_streaming, url)
             else getString(R.string.notification_no_network)
         )
+
+        // Lets WatchActivity find this host automatically instead of requiring a typed-in
+        // address; if registration fails for any reason (e.g. mDNS blocked on this network),
+        // the URL above still works for manual connect.
+        registerNsdService(libraryLabel)
     }
 
     private fun stopStreaming() {
+        unregisterNsdService()
+
         server?.stop()
         server = null
 
@@ -196,6 +207,45 @@ class StreamingService : Service() {
     private fun releaseWakeLock() {
         wakeLock?.let { if (it.isHeld) it.release() }
         wakeLock = null
+    }
+
+    /** Advertises this stream via mDNS/NSD so [WatchActivity] can discover it without a typed address. */
+    private fun registerNsdService(libraryLabel: String) {
+        val manager = (getSystemService(NSD_SERVICE) as? NsdManager) ?: return
+        val info = NsdServiceInfo().apply {
+            serviceName = "${libraryLabel.take(30)} (${Build.MODEL})".take(60)
+            serviceType = NSD_SERVICE_TYPE
+            port = HTTP_PORT
+        }
+        val listener = object : NsdManager.RegistrationListener {
+            override fun onServiceRegistered(info: NsdServiceInfo) = Unit
+            override fun onRegistrationFailed(info: NsdServiceInfo, errorCode: Int) {
+                Log.w(TAG, "NSD registration failed: $errorCode")
+            }
+            override fun onServiceUnregistered(info: NsdServiceInfo) = Unit
+            override fun onUnregistrationFailed(info: NsdServiceInfo, errorCode: Int) = Unit
+        }
+        try {
+            manager.registerService(info, NsdManager.PROTOCOL_DNS_SD, listener)
+            nsdManager = manager
+            nsdRegistrationListener = listener
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not register NSD service", e)
+        }
+    }
+
+    private fun unregisterNsdService() {
+        val manager = nsdManager
+        val listener = nsdRegistrationListener
+        nsdManager = null
+        nsdRegistrationListener = null
+        if (manager != null && listener != null) {
+            try {
+                manager.unregisterService(listener)
+            } catch (e: Exception) {
+                // Already unregistered, or registration never succeeded; nothing to clean up.
+            }
+        }
     }
 
     private fun createNotificationChannel() {
@@ -232,6 +282,7 @@ class StreamingService : Service() {
     }
 
     override fun onDestroy() {
+        unregisterNsdService()
         server?.stop()
         releaseWakeLock()
         super.onDestroy()
@@ -247,6 +298,8 @@ class StreamingService : Service() {
         const val EXTRA_DEFAULT_SORT = "com.videostream.local.extra.DEFAULT_SORT"
         const val HTTP_PORT = 8080
         const val DEFAULT_SORT_PARAM = "name"
+        /** NSD/mDNS service type this app's streams advertise themselves under, for WatchActivity to discover. */
+        const val NSD_SERVICE_TYPE = "_videostream._tcp."
         private const val CHANNEL_ID = "streaming_channel"
         private const val NOTIFICATION_ID = 1
         private const val WAKE_LOCK_TIMEOUT_MS = 12 * 60 * 60 * 1000L // 12h safety cap

@@ -35,7 +35,11 @@
 
     <string name="watch_address_hint">Host address (e.g. 192.168.1.23)</string>
     <string name="watch_connect">Connect</string>
-    <string name="watch_hint">Enter the address shown on the hosting device and tap Connect</string>
+    <string name="watch_hint">Tap a host above, or enter its address manually and tap Connect</string>
     <string name="watch_invalid_address">Enter a valid address</string>
     <string name="watch_connection_failed">Could not connect. Check the address and that both devices are on the same network.</string>
+
+    <string name="watch_discovery_title">Hosts on your network</string>
+    <string name="watch_discovery_refresh">Search again</string>
+    <string name="watch_discovery_empty">No hosts found yet — you can also enter the address manually below.</string>
 </resources>

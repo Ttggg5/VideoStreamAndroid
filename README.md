@@ -47,10 +47,16 @@ with a built-in screen to open another device's stream.
 - **Stay alive**: the server runs inside a foreground `Service`, so
   streaming keeps going even if you switch away from the app (the
   notification shows the URL and has a Stop action).
-- **Watch**: the app also has a built-in **Watch a Stream** screen — type
-  in the hosting device's address and it opens that device's page in an
-  embedded browser, so you don't need a separate laptop/browser to view
-  a stream; another copy of this app works as the viewer too.
+- **Watch**: the app also has a built-in **Watch a Stream** screen. It
+  automatically finds hosts on the same local network via NSD/mDNS
+  service discovery (`android.net.nsd`) — every host advertises itself
+  under `_videostream._tcp.` as soon as it starts streaming — and lists
+  them for a tap to connect; typing in the hosting device's address and
+  tapping **Connect** still works too, for networks where discovery
+  doesn't reach (see Known limitations). Either way it opens that
+  device's page in an embedded browser, so you don't need a separate
+  laptop/browser to view a stream; another copy of this app works as the
+  viewer too.
 
 Any modern browser plays the stream directly with a `<video>` tag —
 no app or plugin needed on the viewing device. Desktop media players like
@@ -109,9 +115,13 @@ VLC can also open the `http://<ip>:8080/video` URL directly.
 
 ### Watching from this app
 
-1. Tap **Watch a Stream**.
-2. Enter the address shown on the hosting device (just the IP, e.g.
-   `192.168.1.23`, or the full URL) and tap **Connect**.
+1. Tap **Watch a Stream**. The screen searches the local network for
+   hosts and lists any it finds (name and address); tap the search icon
+   to search again.
+2. Tap a host in the list, **or** — if none show up, or you'd rather
+   connect directly — enter the address shown on the hosting device
+   (just the IP, e.g. `192.168.1.23`, or the full URL) and tap
+   **Connect**.
 3. The host's page loads in an embedded browser — browse the folder and
    pick a video (folder mode) or it starts playing right away
    (single-file mode).
@@ -122,7 +132,7 @@ VLC can also open the `http://<ip>:8080/video` URL directly.
 app/src/main/java/com/videostream/local/
   MainActivity.kt        Landing screen: choose Host or Watch
   HostActivity.kt         Host UI: file/folder picker, start/stop, notification permission
-  WatchActivity.kt        Viewer UI: address input + embedded WebView browser
+  WatchActivity.kt        Viewer UI: NSD host discovery + address input + embedded WebView browser
   StreamingService.kt      Foreground service hosting the HTTP server; scans folders for videos
   MediaHttpServer.kt      NanoHTTPD server; serves a folder-structured browsing UI and byte-range video streaming
   ThumbnailUtil.kt         Extracts a downscaled JPEG preview frame from a video, used by both the server and HostActivity
@@ -190,3 +200,7 @@ plug in `r0adkll/upload-google-play` (or similar) once those secrets exist.
 - The in-app **Watch a Stream** screen has no encryption/authentication
   either (it's a plain embedded browser over HTTP), matching the host's
   own local-network-only design.
+- Automatic host discovery relies on mDNS/NSD multicast traffic reaching
+  both devices; some Wi-Fi hotspot implementations isolate clients from
+  each other (AP/client isolation) and block it, so a discovered host
+  may not always show up even when the manual address still works fine.

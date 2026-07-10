@@ -28,6 +28,12 @@ with a built-in screen to open another device's stream.
   the folder browsing grid and as the player's poster image. A folder
   with more than one video gets a **Sort** bar (Name / Newest / Largest)
   that carries through folder navigation and back out of the player.
+  The player page itself shows the rest of that folder as a **playlist**
+  next to the video; clicking another entry, or letting the current one
+  finish, switches to it in place (swaps the `<video>` source and calls
+  `.play()`) instead of reloading the page — this needs a bit of inline
+  JavaScript, which is why `WatchActivity`'s embedded browser runs with
+  JS enabled.
 - **Stay alive**: the server runs inside a foreground `Service`, so
   streaming keeps going even if you switch away from the app (the
   notification shows the URL and has a Stop action).

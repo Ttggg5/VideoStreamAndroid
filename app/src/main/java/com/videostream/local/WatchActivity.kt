@@ -26,8 +26,12 @@ class WatchActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         binding.webView.settings.apply {
+            // Required for the host's playlist / next-video-without-reload player script.
+            // Safe here: this WebView only ever loads pages this app's own server renders by
+            // default, and no JavascriptInterface bridge is exposed to give page script any
+            // access beyond the normal WebView sandbox.
             @Suppress("SetJavaScriptEnabled")
-            javaScriptEnabled = false
+            javaScriptEnabled = true
             mediaPlaybackRequiresUserGesture = false
             domStorageEnabled = true
         }

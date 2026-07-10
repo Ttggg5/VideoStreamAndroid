@@ -183,11 +183,31 @@ class MediaHttpServer(
     }
 
     private fun watchPage(entry: VideoEntry, sortMode: SortMode): Response {
+        // The playlist is the other videos alongside this one in the same folder — same
+        // scope as what the browse page would show, in the same sort order.
+        val siblings = if (isFolderMode) {
+            sortVideos(entries.filter { it.folderPath == entry.folderPath }, sortMode)
+        } else {
+            listOf(entry)
+        }
+        val showPlaylist = isFolderMode && siblings.size > 1
+
         val backLink = if (isFolderMode) {
-            "<p><a class=\"back\" href=\"/browse?path=${encodePath(entry.folderPath)}&sort=${sortMode.param}\">&larr; Back</a></p>"
+            "<a class=\"back\" href=\"/browse?path=${encodePath(entry.folderPath)}&sort=${sortMode.param}\">&larr; Back</a>"
         } else {
             ""
         }
+        val playlistItems = siblings.joinToString("\n") { item ->
+            val activeClass = if (item.id == entry.id) " class=\"active\"" else ""
+            """
+            <li$activeClass data-id="${item.id}">
+              <img src="/thumbnail?id=${item.id}" loading="lazy" alt="">
+              <span>${escapeHtml(item.name)}</span>
+            </li>
+            """.trimIndent()
+        }
+        val playlistJson = siblings.joinToString(",") { item -> "{\"id\":${item.id},\"name\":${jsonString(item.name)}}" }
+
         val html = """
             <!DOCTYPE html>
             <html>
@@ -196,17 +216,100 @@ class MediaHttpServer(
               <meta name="viewport" content="width=device-width, initial-scale=1">
               <title>${escapeHtml(entry.name)}</title>
               <style>
-                body { margin: 0; background: #111; color: #eee; font-family: sans-serif; }
-                .back { display: inline-block; margin: 12px 16px; color: #9cf; text-decoration: none; }
-                .player { display: flex; align-items: center; justify-content: center; height: ${if (backLink.isEmpty()) "100vh" else "calc(100vh - 48px)"}; }
+                html, body { margin: 0; height: 100%; background: #111; color: #eee; font-family: sans-serif; }
+                body { display: flex; flex-direction: column; }
+                .topbar { display: flex; align-items: center; gap: 16px; padding: 10px 16px; flex-shrink: 0; }
+                .back { color: #9cf; text-decoration: none; flex-shrink: 0; }
+                #currentTitle { font-size: 14px; color: #ccc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                .main { flex: 1; display: flex; min-height: 0; }
+                .player { flex: 1; display: flex; align-items: center; justify-content: center; background: #000; min-width: 0; }
                 video { max-width: 100%; max-height: 100%; }
+                .playlist { width: 280px; flex-shrink: 0; overflow-y: auto; border-left: 1px solid #222; list-style: none; margin: 0; padding: 0; }
+                .playlist li { display: flex; gap: 8px; align-items: center; padding: 8px; cursor: pointer; }
+                .playlist li:hover { background: #1a1a1a; }
+                .playlist li.active { background: #232323; box-shadow: inset 3px 0 0 #9cf; }
+                .playlist img { width: 72px; aspect-ratio: 16 / 9; object-fit: cover; background: #000; border-radius: 4px; flex-shrink: 0; }
+                .playlist span { font-size: 12px; word-break: break-word; }
+                @media (max-width: 700px) {
+                  .main { flex-direction: column; }
+                  .playlist { width: 100%; max-height: 35vh; border-left: none; border-top: 1px solid #222; }
+                }
               </style>
             </head>
             <body>
-              $backLink
-              <div class="player">
-                <video controls autoplay poster="/thumbnail?id=${entry.id}" src="/video?id=${entry.id}"></video>
+              <div class="topbar">
+                $backLink
+                <span id="currentTitle">${escapeHtml(entry.name)}</span>
               </div>
+              <div class="main">
+                <div class="player">
+                  <video id="player" controls autoplay poster="/thumbnail?id=${entry.id}" src="/video?id=${entry.id}"></video>
+                </div>
+                ${if (showPlaylist) "<ul class=\"playlist\" id=\"playlist\">$playlistItems</ul>" else ""}
+              </div>
+              <script>
+              (function () {
+                var playlist = [$playlistJson];
+                var currentId = ${entry.id};
+                var video = document.getElementById('player');
+                var titleEl = document.getElementById('currentTitle');
+                var listEl = document.getElementById('playlist');
+
+                function indexOf(id) {
+                  for (var i = 0; i < playlist.length; i++) {
+                    if (playlist[i].id === id) return i;
+                  }
+                  return -1;
+                }
+
+                function playItem(id, pushHistory) {
+                  var item = playlist[indexOf(id)];
+                  if (!item) return;
+                  currentId = id;
+                  video.src = '/video?id=' + id;
+                  video.poster = '/thumbnail?id=' + id;
+                  video.load();
+                  video.play().catch(function () {});
+                  titleEl.textContent = item.name;
+                  document.title = item.name;
+                  if (pushHistory !== false && window.history && window.history.pushState) {
+                    window.history.pushState({ id: id }, '', '/watch?id=' + id + '&sort=${sortMode.param}');
+                  }
+                  if (listEl) {
+                    var nodes = listEl.querySelectorAll('li');
+                    for (var j = 0; j < nodes.length; j++) {
+                      var match = parseInt(nodes[j].getAttribute('data-id'), 10) === id;
+                      nodes[j].classList.toggle('active', match);
+                    }
+                  }
+                }
+
+                if (listEl) {
+                  listEl.addEventListener('click', function (e) {
+                    var li = e.target.closest('li');
+                    if (!li) return;
+                    var id = parseInt(li.getAttribute('data-id'), 10);
+                    if (id !== currentId) playItem(id, true);
+                  });
+                }
+
+                video.addEventListener('ended', function () {
+                  var idx = indexOf(currentId);
+                  if (idx >= 0 && idx + 1 < playlist.length) {
+                    playItem(playlist[idx + 1].id, true);
+                  }
+                });
+
+                // Keeps the player in sync when the user navigates back/forward through the
+                // playlist history entries created by pushState above, instead of leaving the
+                // video on whatever it happened to be while only the (invisible) URL changes.
+                window.addEventListener('popstate', function (e) {
+                  if (e.state && typeof e.state.id === 'number' && e.state.id !== currentId) {
+                    playItem(e.state.id, false);
+                  }
+                });
+              })();
+              </script>
             </body>
             </html>
         """.trimIndent()
@@ -280,4 +383,22 @@ class MediaHttpServer(
 
     private fun escapeHtml(text: String): String =
         text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    /** Encodes [text] as a JSON string literal, safe to inline into a `<script>` block. */
+    private fun jsonString(text: String): String {
+        val sb = StringBuilder("\"")
+        for (c in text) {
+            when (c) {
+                '"' -> sb.append("\\\"")
+                '\\' -> sb.append("\\\\")
+                '\n' -> sb.append("\\n")
+                '\r' -> sb.append("\\r")
+                '\t' -> sb.append("\\t")
+                '<' -> sb.append("\\u003c") // avoids a stray "</script>" breaking out of the tag
+                else -> if (c.code < 0x20) sb.append("\\u%04x".format(c.code)) else sb.append(c)
+            }
+        }
+        sb.append("\"")
+        return sb.toString()
+    }
 }

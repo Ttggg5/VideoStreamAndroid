@@ -2,13 +2,16 @@
 <resources>
     <string name="app_name">Local Video Stream</string>
 
+    <string name="choose_video">Choose Video File</string>
+    <string name="no_video_selected">No video file selected</string>
+    <string name="selected_video">Selected: %1$s</string>
+
     <string name="start_streaming">Start Streaming</string>
     <string name="stop_streaming">Stop Streaming</string>
 
     <string name="status_idle">Not streaming</string>
     <string name="status_starting">Starting...</string>
     <string name="status_streaming_at">Open on another device: %1$s</string>
-    <string name="status_camera_permission_required">Camera permission is required to stream</string>
 
     <string name="notification_channel_name">Local video streaming</string>
     <string name="notification_title">Local Video Stream</string>

@@ -6,11 +6,13 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.provider.OpenableColumns
+import android.view.View
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -101,6 +103,7 @@ class HostActivity : AppCompatActivity() {
         selectedName = queryDisplayName(uri) ?: uri.lastPathSegment ?: "video"
         binding.selectedFileText.text = getString(R.string.selected_video, selectedName)
         binding.toggleButton.isEnabled = true
+        loadThumbnailPreview(uri)
     }
 
     private fun onFolderSelected(uri: Uri) {
@@ -110,6 +113,28 @@ class HostActivity : AppCompatActivity() {
         selectedName = DocumentFile.fromTreeUri(this, uri)?.name ?: "Folder"
         binding.selectedFileText.text = getString(R.string.selected_folder, selectedName)
         binding.toggleButton.isEnabled = true
+        hideThumbnailPreview()
+    }
+
+    /** Folders don't have a single representative thumbnail, so this only applies to single-file mode. */
+    private fun loadThumbnailPreview(uri: Uri) {
+        hideThumbnailPreview()
+        Thread {
+            val jpeg = ThumbnailUtil.extractThumbnailJpeg(contentResolver, uri)
+            val bitmap = jpeg?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
+            runOnUiThread {
+                // Only apply if the user hasn't picked something else while this was loading.
+                if (bitmap != null && selectedUri == uri) {
+                    binding.thumbnailPreview.setImageBitmap(bitmap)
+                    binding.thumbnailPreview.visibility = View.VISIBLE
+                }
+            }
+        }.start()
+    }
+
+    private fun hideThumbnailPreview() {
+        binding.thumbnailPreview.visibility = View.GONE
+        binding.thumbnailPreview.setImageDrawable(null)
     }
 
     private fun takePersistablePermission(uri: Uri) {

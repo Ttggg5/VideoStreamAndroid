@@ -3,8 +3,10 @@ package com.videostream.local
 import android.content.ContentResolver
 import android.os.ParcelFileDescriptor
 import fi.iki.elonen.NanoHTTPD
+import java.io.ByteArrayInputStream
 import java.io.FileInputStream
 import java.net.URLEncoder
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Serves one or more existing video files over HTTP with byte-range support, so a
@@ -21,6 +23,10 @@ class MediaHttpServer(
     private val libraryName: String,
     private val isFolderMode: Boolean
 ) : NanoHTTPD(port) {
+
+    // Keyed by VideoEntry.id. An empty array means extraction was already tried and failed,
+    // so a broken/DRM'd file isn't re-decoded on every thumbnail request.
+    private val thumbnailCache = ConcurrentHashMap<Int, ByteArray>()
 
     /** Closes the underlying [ParcelFileDescriptor] together with the stream view over it. */
     private class ClosingFileInputStream(private val pfd: ParcelFileDescriptor) :
@@ -40,6 +46,7 @@ class MediaHttpServer(
             "/browse" -> browsePage(session.parameters["path"]?.firstOrNull().orEmpty())
             "/watch" -> serveWatch(session)
             "/video" -> serveVideo(session)
+            "/thumbnail" -> serveThumbnail(session)
             else -> newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Not found")
         }
     }
@@ -90,7 +97,14 @@ class MediaHttpServer(
             "<li><a href=\"/browse?path=${encodePath(childPath)}\">&#128193; ${escapeHtml(folderName)}</a></li>"
         }
         val videoItems = videos.joinToString("\n") { entry ->
-            "<li><a href=\"/watch?id=${entry.id}\">&#127909; ${escapeHtml(entry.name)}</a></li>"
+            """
+            <li>
+              <a href="/watch?id=${entry.id}">
+                <img src="/thumbnail?id=${entry.id}" loading="lazy" alt="">
+                <span>${escapeHtml(entry.name)}</span>
+              </a>
+            </li>
+            """.trimIndent()
         }
 
         val html = """
@@ -103,17 +117,24 @@ class MediaHttpServer(
               <style>
                 body { margin: 0; padding: 24px; background: #111; color: #eee; font-family: sans-serif; }
                 h1 { font-size: 20px; }
-                ul { list-style: none; padding: 0; }
-                li { margin: 4px 0; }
-                a { display: block; padding: 12px 16px; background: #222; color: #fff; text-decoration: none; border-radius: 8px; }
-                a:hover { background: #333; }
+                ul.folders { list-style: none; padding: 0; margin: 0 0 16px; }
+                ul.folders li { margin: 4px 0; }
+                ul.folders a { display: block; padding: 12px 16px; background: #222; color: #fff; text-decoration: none; border-radius: 8px; }
+                ul.folders a:hover { background: #333; }
+                ul.videos { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+                ul.videos a { display: flex; flex-direction: column; background: #222; color: #fff; text-decoration: none; border-radius: 8px; overflow: hidden; }
+                ul.videos a:hover { background: #333; }
+                ul.videos img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #000; }
+                ul.videos span { padding: 8px; font-size: 13px; word-break: break-word; }
               </style>
             </head>
             <body>
               <h1>${escapeHtml(title)}</h1>
-              <ul>
+              <ul class="folders">
                 $backLink
                 $folderItems
+              </ul>
+              <ul class="videos">
                 $videoItems
               </ul>
             </body>
@@ -145,7 +166,7 @@ class MediaHttpServer(
             <body>
               $backLink
               <div class="player">
-                <video controls autoplay src="/video?id=${entry.id}"></video>
+                <video controls autoplay poster="/thumbnail?id=${entry.id}" src="/video?id=${entry.id}"></video>
               </div>
             </body>
             </html>
@@ -200,6 +221,20 @@ class MediaHttpServer(
             response.addHeader("Content-Range", "bytes $start-$end/$fileSize")
         }
         return response
+    }
+
+    private fun serveThumbnail(session: IHTTPSession): Response {
+        val entry = entryFor(session)
+            ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Video not found")
+
+        val jpeg = thumbnailCache.getOrPut(entry.id) {
+            ThumbnailUtil.extractThumbnailJpeg(contentResolver, entry.uri) ?: ByteArray(0)
+        }
+        return if (jpeg.isNotEmpty()) {
+            newFixedLengthResponse(Response.Status.OK, "image/jpeg", ByteArrayInputStream(jpeg), jpeg.size.toLong())
+        } else {
+            newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "No thumbnail available")
+        }
     }
 
     private fun encodePath(path: String): String = URLEncoder.encode(path, "UTF-8")

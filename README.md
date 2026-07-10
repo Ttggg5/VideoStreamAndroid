@@ -23,7 +23,9 @@ with a built-in screen to open another device's stream.
   a browsable web page mirroring that folder's actual structure — subfolders
   stay subfolders, navigable one level at a time — so a viewer finds and
   picks a video the same way they would in a file browser, rather than
-  facing one giant flattened list.
+  facing one giant flattened list. Each video shows a thumbnail (a frame
+  grabbed a second into the file via `MediaMetadataRetriever`), both in
+  the folder browsing grid and as the player's poster image.
 - **Stay alive**: the server runs inside a foreground `Service`, so
   streaming keeps going even if you switch away from the app (the
   notification shows the URL and has a Stop action).
@@ -62,6 +64,8 @@ VLC can also open the `http://<ip>:8080/video` URL directly.
 2. Tap **Choose Video File** for a single video, or **Choose Folder** to
    pick a whole folder — the app scans it (including subfolders, up to
    500 videos) for playable files.
+   A thumbnail preview appears once a single file is picked (folders
+   don't get one, since there's no single representative frame).
 3. Grant the notification permission if prompted (Android 13+).
 4. Tap **Start Streaming**. The screen shows a URL like
    `http://192.168.1.23:8080`.
@@ -89,7 +93,8 @@ app/src/main/java/com/videostream/local/
   WatchActivity.kt        Viewer UI: address input + embedded WebView browser
   StreamingService.kt      Foreground service hosting the HTTP server; scans folders for videos
   MediaHttpServer.kt      NanoHTTPD server; serves a folder-structured browsing UI and byte-range video streaming
-  VideoEntry.kt            One playable video (id, display name, content Uri)
+  ThumbnailUtil.kt         Extracts a downscaled JPEG preview frame from a video, used by both the server and HostActivity
+  VideoEntry.kt            One playable video (id, display name, folder path, content Uri)
   NetworkUtils.kt          Finds the device's local IPv4 address
 ```
 
@@ -147,6 +152,9 @@ plug in `r0adkll/upload-google-play` (or similar) once those secrets exist.
 - Some cloud-backed "virtual" documents (e.g. certain Google Drive/Photos
   entries) don't expose a normal file descriptor and won't be servable;
   pick a file that's actually stored on the device.
+- Thumbnails depend on the device's codecs being able to decode a frame;
+  an unsupported codec or a corrupt file just shows no thumbnail rather
+  than blocking playback.
 - The in-app **Watch a Stream** screen has no encryption/authentication
   either (it's a plain embedded browser over HTTP), matching the host's
   own local-network-only design.

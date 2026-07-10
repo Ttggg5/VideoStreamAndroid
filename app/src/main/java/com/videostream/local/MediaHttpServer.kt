@@ -279,6 +279,8 @@ class MediaHttpServer(
         val controls = if (showPlaylist) {
             """
             <div class="controls">
+              <button type="button" id="prevBtn" class="navBtn" title="Previous video">&larr; Prev</button>
+              <button type="button" id="nextBtn" class="navBtn" title="Next video">Next &rarr;</button>
               <label class="toggle"><input type="checkbox" id="autoplayToggle"> Autoplay</label>
               <label class="toggle"><input type="checkbox" id="shuffleToggle"> Shuffle</label>
             </div>
@@ -300,8 +302,11 @@ class MediaHttpServer(
                 .topbar { display: flex; align-items: center; gap: 16px; padding: 10px 16px; flex-shrink: 0; flex-wrap: wrap; }
                 .back { color: #9cf; text-decoration: none; flex-shrink: 0; }
                 #currentTitle { font-size: 14px; color: #ccc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-                .controls { display: flex; gap: 12px; margin-left: auto; }
+                .controls { display: flex; gap: 12px; align-items: center; margin-left: auto; }
                 .toggle { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #ccc; white-space: nowrap; }
+                .navBtn { background: #232323; color: #eee; border: 1px solid #3a3a3a; border-radius: 4px; padding: 5px 10px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+                .navBtn:hover:not(:disabled) { background: #2c2c2c; }
+                .navBtn:disabled { opacity: 0.4; cursor: default; }
                 .main { flex: 1; display: flex; min-height: 0; }
                 .player { flex: 1; display: flex; align-items: center; justify-content: center; background: #000; min-width: 0; }
                 video { max-width: 100%; max-height: 100%; }
@@ -338,7 +343,10 @@ class MediaHttpServer(
                 var listEl = document.getElementById('playlist');
                 var autoplayCheckbox = document.getElementById('autoplayToggle');
                 var shuffleCheckbox = document.getElementById('shuffleToggle');
+                var prevBtn = document.getElementById('prevBtn');
+                var nextBtn = document.getElementById('nextBtn');
                 var shuffleQueue = [];
+                var playHistory = [];
 
                 function loadPref(key, defaultValue) {
                   var v = localStorage.getItem(key);
@@ -363,6 +371,7 @@ class MediaHttpServer(
                     shuffleMode = shuffleCheckbox.checked;
                     savePref('shuffleMode', shuffleMode);
                     shuffleQueue = [];
+                    updateNavButtons();
                   });
                 }
 
@@ -397,9 +406,13 @@ class MediaHttpServer(
                   return (idx >= 0 && idx + 1 < playlist.length) ? playlist[idx + 1].id : null;
                 }
 
-                function playItem(id, pushHistory) {
+                // trackHistory records the video we're leaving so the Prev button can retrace
+                // actual play order (including shuffle jumps); back/forward navigation and the
+                // Prev button itself pass false so they don't create their own history entries.
+                function playItem(id, pushHistory, trackHistory) {
                   var item = playlist[indexOf(id)];
                   if (!item) return;
+                  if (trackHistory !== false && currentId !== id) playHistory.push(currentId);
                   currentId = id;
                   video.src = '/video?id=' + id;
                   video.poster = '/thumbnail?id=' + id;
@@ -421,29 +434,54 @@ class MediaHttpServer(
                       nodes[j].classList.toggle('active', match);
                     }
                   }
+                  updateNavButtons();
                 }
+
+                function updateNavButtons() {
+                  var idx = indexOf(currentId);
+                  if (prevBtn) prevBtn.disabled = playHistory.length === 0 && idx <= 0;
+                  if (nextBtn) nextBtn.disabled = !shuffleMode && (idx < 0 || idx >= playlist.length - 1);
+                }
+
+                function goNext() {
+                  var nextId = nextIdForAutoplay();
+                  if (nextId !== null) playItem(nextId, true, true);
+                }
+
+                function goPrev() {
+                  if (playHistory.length > 0) {
+                    playItem(playHistory.pop(), true, false);
+                    return;
+                  }
+                  var idx = indexOf(currentId);
+                  if (idx > 0) playItem(playlist[idx - 1].id, true, false);
+                }
+
+                if (prevBtn) prevBtn.addEventListener('click', goPrev);
+                if (nextBtn) nextBtn.addEventListener('click', goNext);
 
                 if (listEl) {
                   listEl.addEventListener('click', function (e) {
                     var li = e.target.closest('li');
                     if (!li) return;
                     var id = parseInt(li.getAttribute('data-id'), 10);
-                    if (id !== currentId) playItem(id, true);
+                    if (id !== currentId) playItem(id, true, true);
                   });
                 }
 
                 video.addEventListener('ended', function () {
                   if (!autoplayNext) return;
-                  var nextId = nextIdForAutoplay();
-                  if (nextId !== null) playItem(nextId, true);
+                  goNext();
                 });
+
+                updateNavButtons();
 
                 // Keeps the player in sync when the user navigates back/forward through the
                 // playlist history entries created by pushState above, instead of leaving the
                 // video on whatever it happened to be while only the (invisible) URL changes.
                 window.addEventListener('popstate', function (e) {
                   if (e.state && typeof e.state.id === 'number' && e.state.id !== currentId) {
-                    playItem(e.state.id, false);
+                    playItem(e.state.id, false, false);
                   }
                 });
               })();

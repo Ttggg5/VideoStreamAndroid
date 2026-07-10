@@ -279,12 +279,20 @@ class MediaHttpServer(
         val controls = if (showPlaylist) {
             """
             <div class="controls">
-              <button type="button" id="prevBtn" class="navBtn" title="Previous video">&larr; Prev</button>
-              <button type="button" id="nextBtn" class="navBtn" title="Next video">Next &rarr;</button>
               <label class="toggle"><input type="checkbox" id="autoplayToggle"> Autoplay</label>
               <label class="toggle"><input type="checkbox" id="shuffleToggle"> Shuffle</label>
             </div>
             """.trimIndent()
+        } else {
+            ""
+        }
+        val prevOverlayButton = if (showPlaylist) {
+            "<button type=\"button\" id=\"prevBtn\" class=\"navOverlayBtn navPrev\" title=\"Previous video\">&#8249;</button>"
+        } else {
+            ""
+        }
+        val nextOverlayButton = if (showPlaylist) {
+            "<button type=\"button\" id=\"nextBtn\" class=\"navOverlayBtn navNext\" title=\"Next video\">&#8250;</button>"
         } else {
             ""
         }
@@ -304,12 +312,31 @@ class MediaHttpServer(
                 #currentTitle { font-size: 14px; color: #ccc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
                 .controls { display: flex; gap: 12px; align-items: center; margin-left: auto; }
                 .toggle { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #ccc; white-space: nowrap; }
-                .navBtn { background: #232323; color: #eee; border: 1px solid #3a3a3a; border-radius: 4px; padding: 5px 10px; font-size: 12px; cursor: pointer; white-space: nowrap; }
-                .navBtn:hover:not(:disabled) { background: #2c2c2c; }
-                .navBtn:disabled { opacity: 0.4; cursor: default; }
                 .main { flex: 1; display: flex; min-height: 0; }
-                .player { flex: 1; display: flex; align-items: center; justify-content: center; background: #000; min-width: 0; }
+                .player { flex: 1; position: relative; display: flex; align-items: center; justify-content: center; background: #000; min-width: 0; }
                 video { max-width: 100%; max-height: 100%; }
+                .navOverlayBtn {
+                  position: absolute;
+                  top: 50%;
+                  transform: translateY(-50%);
+                  width: 44px;
+                  height: 44px;
+                  border-radius: 50%;
+                  border: none;
+                  background: rgba(0, 0, 0, 0.45);
+                  color: #fff;
+                  font-size: 24px;
+                  line-height: 1;
+                  cursor: pointer;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                  z-index: 2;
+                }
+                .navOverlayBtn:hover:not(:disabled) { background: rgba(0, 0, 0, 0.7); }
+                .navOverlayBtn:disabled { opacity: 0.25; cursor: default; }
+                .navPrev { left: 12px; }
+                .navNext { right: 12px; }
                 .playlist { width: 280px; flex-shrink: 0; overflow-y: auto; border-left: 1px solid #222; list-style: none; margin: 0; padding: 0; }
                 .playlist li { display: flex; gap: 8px; align-items: center; padding: 8px; cursor: pointer; }
                 .playlist li:hover { background: #1a1a1a; }
@@ -330,7 +357,9 @@ class MediaHttpServer(
               </div>
               <div class="main">
                 <div class="player">
+                  $prevOverlayButton
                   <video id="player" controls autoplay poster="/thumbnail?id=${entry.id}" src="/video?id=${entry.id}"></video>
+                  $nextOverlayButton
                 </div>
                 ${if (showPlaylist) "<ul class=\"playlist\" id=\"playlist\">$playlistItems</ul>" else ""}
               </div>

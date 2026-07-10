@@ -35,15 +35,16 @@ with a built-in screen to open another device's stream.
   **Autoplay** / **Shuffle** checkboxes on the player — remembered per
   browser via `localStorage`, not something the host configures once for
   everyone. The player page shows the rest of the current folder as a
-  **playlist** next to the video, plus **Prev** / **Next** buttons above
-  it; clicking another entry, pressing Prev/Next, letting the current one
-  finish (autoplay), or shuffle picking one at random all switch to it in
-  place (swap the `<video>` source and call `.play()`) instead of
-  reloading the page — this needs a bit of inline JavaScript, which is why
-  `WatchActivity`'s embedded browser runs with JS enabled. Next follows
-  shuffle order when Shuffle is on; Prev retraces actual play order
-  (including shuffle jumps) and is disabled once there's nowhere earlier
-  to go.
+  **playlist** next to the video, with **‹ Prev** / **Next ›** buttons
+  overlaid on the video itself (left/right edges, like a typical media
+  player); clicking another entry, pressing Prev/Next, letting the
+  current one finish (autoplay), or shuffle picking one at random all
+  switch to it in place (swap the `<video>` source and call `.play()`)
+  instead of reloading the page — this needs a bit of inline JavaScript,
+  which is why `WatchActivity`'s embedded browser runs with JS enabled.
+  Next follows shuffle order when Shuffle is on; Prev retraces actual
+  play order (including shuffle jumps) and is disabled once there's
+  nowhere earlier to go.
 - **Stay alive**: the server runs inside a foreground `Service`, so
   streaming keeps going even if you switch away from the app (the
   notification shows the URL and has a Stop action).
@@ -105,8 +106,8 @@ VLC can also open the `http://<ip>:8080/video` URL directly.
    - **View: Folders / All videos** on the browse page — switches
      between the folder hierarchy and one flat list of every video (each
      tagged with its original subfolder).
-   - **Prev** / **Next** buttons on the player — jump to the previous or
-     next playlist entry without reloading the page.
+   - **‹ Prev** / **Next ›** buttons overlaid on the video itself — jump
+     to the previous or next playlist entry without reloading the page.
    - **Autoplay** on the player — advances to the next playlist entry
      when the current video ends.
    - **Shuffle** on the player — with Autoplay on (or when pressing

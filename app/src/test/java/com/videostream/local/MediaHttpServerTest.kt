@@ -328,6 +328,11 @@ class MediaHttpServerTest {
         assertTrue("host player should stay muted rather than play audio itself", body.contains("muted: true"))
         assertTrue("video picture itself should be hidden, not shown", body.contains(".vjs-tech"))
         assertTrue("the currently playing video's name should be surfaced", body.contains("nowPlayingTitle"))
+        assertTrue(
+            "controls must not auto-hide after inactivity — there's no video picture here to " +
+                "move the mouse over to bring them back",
+            body.contains("inactivityTimeout: 0")
+        )
     }
 
     @Test

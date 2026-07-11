@@ -985,8 +985,18 @@ class MediaHttpServer(
                 .video-js .vjs-loading-spinner {
                   display: none !important;
                 }
-                .video-js .vjs-control-bar {
-                  position: relative; background-color: transparent; opacity: 1; height: 40px;
+                /* !important: video.js's own stylesheet fades the control bar to invisible after
+                   a couple of seconds of inactivity (a `.vjs-user-inactive` rule with higher
+                   specificity than a plain override), which — with no video picture on this
+                   page for anyone to move the mouse over — would otherwise make the controls
+                   disappear for good shortly after picking a video. inactivityTimeout: 0 on the
+                   player itself (see below) is the primary fix; this is a belt-and-suspenders
+                   backstop in case that rule's specificity still wins somewhere. */
+                .video-js .vjs-control-bar,
+                .video-js.vjs-user-inactive .vjs-control-bar,
+                .video-js.vjs-user-inactive.vjs-playing .vjs-control-bar {
+                  position: relative; background-color: transparent; opacity: 1 !important;
+                  visibility: visible !important; height: 40px;
                 }
                 .video-js .vjs-slider { background-color: rgba(255, 255, 255, 0.15); }
                 .video-js .vjs-play-progress { background-color: var(--accent); }
@@ -1049,7 +1059,14 @@ class MediaHttpServer(
                 var lastSeekRevision = ${current.seekRevision};
                 // Muted: this device is a remote, not a viewer — it decodes the video only to
                 // drive a real seek bar/duration, not to be watched or listened to itself.
-                var player = document.getElementById('player') ? videojs('player', { autoplay: true, muted: true }) : null;
+                // inactivityTimeout: 0 stops video.js fading the control bar to invisible after
+                // a couple of seconds of no mouse movement — normally fine for an actual video
+                // (moving the mouse over the picture wakes it back up), but there's no picture
+                // here for anyone to hover over, so the controls would otherwise vanish for good
+                // moments after picking a video.
+                var player = document.getElementById('player')
+                  ? videojs('player', { autoplay: true, muted: true, inactivityTimeout: 0 })
+                  : null;
                 // Set while applying a command that arrived from /remote/state, so the player
                 // events that fire as a side effect don't get echoed straight back as a new
                 // command — otherwise every incoming play/pause/seek would immediately re-send

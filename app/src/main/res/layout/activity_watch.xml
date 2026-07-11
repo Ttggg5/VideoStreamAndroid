@@ -137,4 +137,18 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
+    <!-- Hosts the native view Chromium hands back for HTML5 video fullscreen (video.js's
+         fullscreen button), covering the whole screen while active — see
+         WatchActivity's WebChromeClient. -->
+    <FrameLayout
+        android:id="@+id/fullscreenContainer"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:background="#000000"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

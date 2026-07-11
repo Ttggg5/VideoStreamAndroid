@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
+import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -17,6 +18,9 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.videostream.local.databinding.ActivityWatchBinding
 
 /**
@@ -36,6 +40,12 @@ class WatchActivity : AppCompatActivity() {
     private var discoveryListener: NsdManager.DiscoveryListener? = null
     private var discoveryActive = false
     private var connected = false
+
+    // Tracks the native view Chromium hands back while an in-page <video> (e.g. video.js's
+    // fullscreen button) is fullscreen, so the back button can exit it and onHideCustomView
+    // can clean up — a plain WebView without a WebChromeClient can't enter fullscreen at all.
+    private var fullscreenView: View? = null
+    private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
 
     private data class DiscoveredHost(val name: String, val host: String, val port: Int)
 
@@ -79,6 +89,29 @@ class WatchActivity : AppCompatActivity() {
                 }
             }
         }
+        binding.webView.webChromeClient = object : WebChromeClient() {
+            override fun onShowCustomView(view: View, callback: CustomViewCallback) {
+                if (fullscreenView != null) {
+                    callback.onCustomViewHidden()
+                    return
+                }
+                fullscreenView = view
+                fullscreenCallback = callback
+                binding.fullscreenContainer.addView(view)
+                binding.fullscreenContainer.visibility = View.VISIBLE
+                binding.webView.visibility = View.INVISIBLE
+                setImmersiveMode(true)
+            }
+
+            override fun onHideCustomView() {
+                binding.fullscreenContainer.removeAllViews()
+                binding.fullscreenContainer.visibility = View.GONE
+                binding.webView.visibility = View.VISIBLE
+                fullscreenView = null
+                fullscreenCallback = null
+                setImmersiveMode(false)
+            }
+        }
 
         binding.connectButton.setOnClickListener { connect() }
         binding.addressInput.setOnEditorActionListener { _, actionId, event ->
@@ -95,11 +128,13 @@ class WatchActivity : AppCompatActivity() {
         binding.discoveryRefreshButton.setOnClickListener { restartDiscovery() }
 
         onBackPressedDispatcher.addCallback(this) {
-            if (binding.webView.canGoBack()) {
-                binding.webView.goBack()
-            } else {
-                isEnabled = false
-                onBackPressedDispatcher.onBackPressed()
+            when {
+                fullscreenView != null -> fullscreenCallback?.onCustomViewHidden()
+                binding.webView.canGoBack() -> binding.webView.goBack()
+                else -> {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                }
             }
         }
 
@@ -267,6 +302,18 @@ class WatchActivity : AppCompatActivity() {
             container.addView(row)
         }
         binding.discoveryEmptyText.visibility = if (hosts.isEmpty()) View.VISIBLE else View.GONE
+    }
+
+    /** Hides/restores the status and navigation bars for fullscreen video playback. */
+    private fun setImmersiveMode(enabled: Boolean) {
+        WindowCompat.setDecorFitsSystemWindows(window, !enabled)
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        if (enabled) {
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+        } else {
+            controller.show(WindowInsetsCompat.Type.systemBars())
+        }
     }
 
     override fun onDestroy() {

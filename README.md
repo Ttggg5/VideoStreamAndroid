@@ -52,7 +52,12 @@ with a built-in screen to open another device's stream.
   JavaScript, which is why `WatchActivity`'s embedded browser runs with
   JS enabled. Next follows shuffle order when Shuffle is on; Prev
   retraces actual play order (including shuffle jumps) and is disabled
-  once there's nowhere earlier to go.
+  once there's nowhere earlier to go. video.js's fullscreen button works
+  in-app too — `WatchActivity` registers a `WebChromeClient` so its
+  embedded browser can hand fullscreen video off to a real full-screen
+  native view (hiding the status/nav bars) the same way a full browser
+  would; without one, a plain `WebView` silently can't enter fullscreen
+  at all.
 - **Stay alive**: the server runs inside a foreground `Service`, so
   streaming keeps going even if you switch away from the app (the
   notification shows the URL and has a Stop action).

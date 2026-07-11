@@ -115,18 +115,28 @@ object RemoteLibraryApi {
 
     fun fetchRemoteState(baseUrl: String): RemoteState? {
         val json = getJson("$baseUrl/remote/state") ?: return null
-        return try {
-            RemoteState(
-                videoId = if (json.isNull("videoId")) null else json.getInt("videoId"),
-                revision = json.getLong("revision"),
-                playing = json.getBoolean("playing"),
-                playRevision = json.getLong("playRevision"),
-                seekSeconds = if (json.isNull("seekSeconds")) null else json.getDouble("seekSeconds"),
-                seekRevision = json.getLong("seekRevision")
-            )
-        } catch (e: Exception) {
-            null
-        }
+        return parseRemoteState(json)
+    }
+
+    /** Parses a `/remote/state` (or `/remote/ws` push) body — shared by [fetchRemoteState] and
+     *  [RemoteStateSocket]'s WebSocket message handling. */
+    fun parseRemoteState(text: String): RemoteState? = try {
+        parseRemoteState(JSONObject(text))
+    } catch (e: Exception) {
+        null
+    }
+
+    private fun parseRemoteState(json: JSONObject): RemoteState? = try {
+        RemoteState(
+            videoId = if (json.isNull("videoId")) null else json.getInt("videoId"),
+            revision = json.getLong("revision"),
+            playing = json.getBoolean("playing"),
+            playRevision = json.getLong("playRevision"),
+            seekSeconds = if (json.isNull("seekSeconds")) null else json.getDouble("seekSeconds"),
+            seekRevision = json.getLong("seekRevision")
+        )
+    } catch (e: Exception) {
+        null
     }
 
     /** GETs [url] and parses the body as JSON, or null on any network/HTTP/parse failure. */

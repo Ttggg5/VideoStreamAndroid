@@ -84,7 +84,12 @@ dependencies {
     implementation("androidx.media3:media3-ui:1.4.1")
 
     implementation("org.nanohttpd:nanohttpd:2.3.1")
+    // WebSocket support for pushing /remote state changes instantly instead of polling.
+    implementation("org.nanohttpd:nanohttpd-websocket:2.3.1")
+    // WebSocket client for WatchActivity's remote-follow mode (server push above).
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.mockito:mockito-core:5.12.0")
+    testImplementation("com.squareup.okhttp3:okhttp:4.12.0")
 }

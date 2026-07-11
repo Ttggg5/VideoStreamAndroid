@@ -39,11 +39,12 @@ import com.videostream.local.databinding.ActivityWatchBinding
  * [androidx.media3.ui.PlayerView]) both talk to the host's JSON API (`/api/info`, `/api/browse`,
  * `/api/video`) and its existing `/video`/`/thumbnail` routes — see [RemoteLibraryApi].
  *
- * `/remote` support (see [MediaHttpServer]'s doc) is mirrored natively too: this activity polls
- * `/remote/state` the whole time it's connected, and the moment a host ever makes a pick there,
- * takes over the player entirely — hiding its own controls and following play/pause/seek/
- * video-switch commands — until the host leaves remote mode, at which point normal native
- * controls come back for whatever's currently playing.
+ * `/remote` support (see [MediaHttpServer]'s doc) is mirrored natively too: this activity keeps a
+ * [RemoteStateSocket] open to `/remote/ws` the whole time it's connected, and the moment a host
+ * ever makes a pick there, takes over the player entirely — hiding its own controls and following
+ * play/pause/seek/video-switch commands, pushed the instant they happen rather than polled —
+ * until the host leaves remote mode, at which point normal native controls come back for
+ * whatever's currently playing.
  */
 class WatchActivity : BaseActivity() {
 
@@ -88,18 +89,7 @@ class WatchActivity : BaseActivity() {
     private var remoteFollowLoading = false
     private var lastPlayRevision = -1L
     private var lastSeekRevision = -1L
-    private val remotePollRunnable = object : Runnable {
-        override fun run() {
-            val url = baseUrl
-            if (url != null) {
-                Thread {
-                    val state = RemoteLibraryApi.fetchRemoteState(url)
-                    runOnUiThread { if (baseUrl == url) applyRemoteState(state) }
-                }.start()
-            }
-            mainHandler.postDelayed(this, REMOTE_POLL_INTERVAL_MS)
-        }
-    }
+    private var remoteStateSocket: RemoteStateSocket? = null
 
     private data class DiscoveredHost(val name: String, val host: String, val port: Int)
 
@@ -217,7 +207,7 @@ class WatchActivity : BaseActivity() {
             defaultSort = currentSort
         )
         resetRemoteFollowState()
-        startRemotePollingLoop()
+        startRemoteStateSocket()
         if (isFolderMode) {
             showBrowse()
             // A config change (e.g. rotation) drops exact mid-video playback position the same
@@ -242,12 +232,13 @@ class WatchActivity : BaseActivity() {
     override fun onStart() {
         super.onStart()
         startDiscovery()
-        if (baseUrl != null) startRemotePollingLoop()
+        if (baseUrl != null) startRemoteStateSocket()
     }
 
     override fun onStop() {
         stopDiscovery()
-        mainHandler.removeCallbacks(remotePollRunnable)
+        remoteStateSocket?.stop()
+        remoteStateSocket = null
         super.onStop()
     }
 
@@ -287,7 +278,7 @@ class WatchActivity : BaseActivity() {
                 currentFlat = false
                 currentPath = ""
                 resetRemoteFollowState()
-                startRemotePollingLoop()
+                startRemoteStateSocket()
                 if (info.isFolderMode) {
                     showBrowse()
                     loadBrowse("", false)
@@ -316,7 +307,8 @@ class WatchActivity : BaseActivity() {
     }
 
     private fun disconnect() {
-        mainHandler.removeCallbacks(remotePollRunnable)
+        remoteStateSocket?.stop()
+        remoteStateSocket = null
         resetRemoteFollowState()
         releasePlayer()
         baseUrl = null
@@ -543,9 +535,12 @@ class WatchActivity : BaseActivity() {
         lastSeekRevision = -1L
     }
 
-    private fun startRemotePollingLoop() {
-        mainHandler.removeCallbacks(remotePollRunnable)
-        mainHandler.post(remotePollRunnable)
+    private fun startRemoteStateSocket() {
+        val url = baseUrl ?: return
+        remoteStateSocket?.stop()
+        remoteStateSocket = RemoteStateSocket(url, mainHandler) { state ->
+            if (baseUrl == url) applyRemoteState(state)
+        }.also { it.start() }
     }
 
     private fun applyRemoteState(state: RemoteState?) {
@@ -708,7 +703,6 @@ class WatchActivity : BaseActivity() {
     }
 
     companion object {
-        private const val REMOTE_POLL_INTERVAL_MS = 1500L
         // Must stay in the same order as the labels populating browseSortSpinner's adapter.
         private val SORT_VALUES = arrayOf("name", "date", "size")
 

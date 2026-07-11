@@ -69,12 +69,15 @@ with a built-in screen to open another device's stream.
   since this device is controlling the stream, not watching it. The folder
   browser sits below that; tapping a video calls `/remote/select`, and
   using the transport controls calls `/remote/command`. Every other open
-  `/browse`/`/watch` page polls
-  `/remote/state` every 1.5 seconds, and the moment anything's ever been
-  picked there, hands off entirely to a bare, full-screen player with **no
-  controls of its own** — it just shows whatever `/remote` is currently
-  playing and follows play/pause/seek/video-switch commands as they come
-  in. An **Exit remote mode** button on the control panel calls
+  `/browse`/`/watch` page keeps a WebSocket open to `/remote/ws`, which
+  pushes the current state the instant it connects and again on every
+  later change (a `/remote/state` HTTP endpoint still exists as a
+  non-realtime fallback) — no polling interval to wait out — and the
+  moment anything's ever been picked there, hands off entirely to a bare,
+  full-screen player with **no controls of its own** — it just shows
+  whatever `/remote` is currently playing and follows play/pause/seek/
+  video-switch commands as they arrive. An **Exit remote mode** button on
+  the control panel calls
   `/remote/clear`, which sends every one of those bare viewer pages back
   to a normal watch page with its own controls restored. Until `/remote`
   is used for the first time, nothing changes for anyone — it's entirely
@@ -87,7 +90,7 @@ with a built-in screen to open another device's stream.
 - **Watch, natively**: the app's own **Watch a Stream** screen is not a
   browser — it's native views talking to the host's JSON API
   (`/api/info`, `/api/browse`, `/api/video`, alongside the existing
-  `/video`/`/thumbnail`/`/remote/state` routes) and playing video with
+  `/video`/`/thumbnail`/`/remote/ws` routes) and playing video with
   [ExoPlayer](https://developer.android.com/media/media3/exoplayer)
   (`androidx.media3`) instead of an embedded video.js page. It
   automatically finds hosts on the same local network via NSD/mDNS
@@ -103,12 +106,13 @@ with a built-in screen to open another device's stream.
   and Prev/Next — those aren't hand-rolled here the way the web page has
   to, they're just `pauseAtEndOfMediaItems`, `shuffleModeEnabled`, and
   ExoPlayer's built-in previous/next media-item navigation. The screen
-  also polls `/remote/state` for as long as it's connected: the moment a
-  host ever makes a pick on `/remote`, this screen hides its own controls
-  and follows along — same play/pause/seek/video-switch behavior as the
-  bare web viewer — and hands normal controls back once the host leaves
-  remote mode. Another copy of this app works as the viewer too, of
-  course, the same as any other browser would.
+  also keeps a WebSocket (via OkHttp) open to `/remote/ws` for as long as
+  it's connected: the moment a host ever makes a pick on `/remote`, this
+  screen hides its own controls and follows along — same play/pause/seek/
+  video-switch behavior as the bare web viewer, pushed instead of polled
+  — and hands normal controls back once the host leaves remote mode.
+  Another copy of this app works as the viewer too, of course, the same
+  as any other browser would.
 - **Rotates and adapts to bigger screens**: every screen in the app now
   supports landscape (previously locked to portrait) with a dedicated
   layout — the two Host/Watch options sit side by side instead of
@@ -215,6 +219,7 @@ app/src/main/java/com/videostream/local/
   HostActivity.kt         Host UI: file/folder picker, start/stop, notification permission, Remote Control launch
   WatchActivity.kt        Viewer UI: NSD host discovery, native folder/video browsing, ExoPlayer playback, /remote-follow
   RemoteLibraryApi.kt      Blocking HTTP/JSON client for a host's /api/info, /api/browse, /api/video, /remote/state
+  RemoteStateSocket.kt     OkHttp WebSocket client for a host's /remote/ws — reconnecting real-time remote-state push
   BrowseAdapter.kt         RecyclerView adapter mixing folder rows and video grid cells for WatchActivity's browse screen
   ThumbnailLoader.kt       Loads a host's /thumbnail?id=… images into ImageViews with a small in-memory cache
   RemoteControlActivity.kt   Thin WebView wrapper around this device's own /remote page (host-side control panel)

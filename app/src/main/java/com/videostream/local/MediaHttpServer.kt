@@ -4,10 +4,13 @@ import android.content.ContentResolver
 import android.content.res.AssetManager
 import android.os.ParcelFileDescriptor
 import fi.iki.elonen.NanoHTTPD
+import fi.iki.elonen.NanoWSD
 import java.io.ByteArrayInputStream
 import java.io.FileInputStream
+import java.io.IOException
 import java.net.URLEncoder
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -31,12 +34,13 @@ import java.util.concurrent.atomic.AtomicReference
  * LAN) picks on everyone else's behalf, like a TV remote, and gets a transport control panel
  * (play/pause/seek) for whatever's currently selected — the panel decodes the video just enough
  * to drive a real seek bar, but stays muted and never shows the picture, since this device is
- * controlling the stream, not watching it. Every `/browse` and `/watch` page polls
- * `/remote/state`, and once anything's been selected there, hands off entirely to a bare,
- * control-less full-screen player that just follows along — no viewer keeps their own
- * play/pause/seek controls once a remote is driving. Leaving remote mode (the control panel's
- * "Exit remote mode" button, which calls `/remote/clear`) hands every viewer straight back to a
- * normal watch page with its own controls.
+ * controlling the stream, not watching it. Every `/browse` and `/watch` page connects to
+ * `/remote/ws`, which pushes the current state the instant it's opened and again on every
+ * subsequent change — no polling interval to wait out — and once anything's been selected there,
+ * hands off entirely to a bare, control-less full-screen player that just follows along — no
+ * viewer keeps their own play/pause/seek controls once a remote is driving. Leaving remote mode
+ * (the control panel's "Exit remote mode" button, which calls `/remote/clear`) hands every
+ * viewer straight back to a normal watch page with its own controls.
  */
 class MediaHttpServer(
     port: Int,
@@ -50,11 +54,15 @@ class MediaHttpServer(
     /** The host's Settings > Accent color choice, as a "#RRGGBB" string; used as the `--accent`
      *  CSS variable on the browse/watch pages, so a viewer's browser matches the host app's look. */
     private val accentColorHex: String = "#4A5FFF"
-) : NanoHTTPD(port) {
+) : NanoWSD(port) {
 
     // Keyed by VideoEntry.id. An empty array means extraction was already tried and failed,
     // so a broken/DRM'd file isn't re-decoded on every thumbnail request.
     private val thumbnailCache = ConcurrentHashMap<Int, ByteArray>()
+
+    /** Every currently-open `/remote/ws` connection, pushed the current remote state on every
+     *  change instead of making each viewer poll `/remote/state` on a timer. */
+    private val remoteSockets = CopyOnWriteArraySet<RemoteWebSocket>()
 
     /**
      * The current `/remote` pick and playback state. [revision] increments on every select so
@@ -121,7 +129,7 @@ class MediaHttpServer(
         }
     }
 
-    override fun serve(session: IHTTPSession): Response {
+    override fun serveHttp(session: IHTTPSession): Response {
         if (session.uri.startsWith("/assets/")) {
             return serveAsset(session.uri.removePrefix("/assets/"))
         }
@@ -151,6 +159,56 @@ class MediaHttpServer(
             )
             "/api/video" -> apiVideoJson(session)
             else -> newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Not found")
+        }
+    }
+
+    /**
+     * The only WebSocket endpoint this server has, so every upgrade request (NanoWSD routes
+     * these here regardless of URI) becomes a [RemoteWebSocket] pushing `/remote` state — see
+     * [broadcastRemoteState].
+     */
+    override fun openWebSocket(handshake: IHTTPSession): WebSocket = RemoteWebSocket(handshake)
+
+    /** Pushes the current remote state to [handshake] the instant it connects, and again on every
+     *  later change via [broadcastRemoteState] — replaces the `/remote/state` polling loop that
+     *  every `/browse`/`/watch`/remote-follow/[remotePage] page used to run on a timer. */
+    private inner class RemoteWebSocket(handshake: IHTTPSession) : WebSocket(handshake) {
+        override fun onOpen() {
+            remoteSockets.add(this)
+            trySend(remoteStateJsonString())
+        }
+
+        override fun onClose(code: WebSocketFrame.CloseCode?, reason: String?, initiatedByRemote: Boolean) {
+            remoteSockets.remove(this)
+        }
+
+        override fun onMessage(message: WebSocketFrame) {
+            // Purely a push channel — clients never send anything meaningful over it.
+        }
+
+        override fun onPong(pong: WebSocketFrame) {
+        }
+
+        override fun onException(exception: IOException) {
+            remoteSockets.remove(this)
+        }
+
+        fun trySend(json: String): Boolean = try {
+            send(json)
+            true
+        } catch (e: IOException) {
+            remoteSockets.remove(this)
+            false
+        }
+    }
+
+    /** Called after every `/remote/select`, `/remote/command`, and `/remote/clear` mutation so
+     *  every connected viewer/control-panel updates within milliseconds instead of waiting out a
+     *  poll interval. */
+    private fun broadcastRemoteState() {
+        val json = remoteStateJsonString()
+        for (socket in remoteSockets) {
+            socket.trySend(json)
         }
     }
 
@@ -463,17 +521,24 @@ class MediaHttpServer(
               // Hands off to the bare, control-less player as soon as someone picks a video from
               // /remote — a no-op until the first /remote/select ever happens. Once the remote's
               // been used, browsing here would just get interrupted anyway, so this jumps
-              // straight to the page /remote is actually driving.
+              // straight to the page /remote is actually driving. A /remote/ws push (instead of
+              // polling /remote/state) means this happens within milliseconds of the pick.
               (function () {
-                function poll() {
-                  fetch('/remote/state').then(function (r) { return r.json(); }).then(function (state) {
-                    if (state.videoId !== null) {
-                      location.href = '/watch?id=' + state.videoId + '&remote=1';
-                    }
-                  }).catch(function () {});
+                function applyState(state) {
+                  if (state.videoId !== null) {
+                    location.href = '/watch?id=' + state.videoId + '&remote=1';
+                  }
                 }
-                poll();
-                setInterval(poll, 1500);
+                function connect() {
+                  var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+                  var ws = new WebSocket(proto + '//' + location.host + '/remote/ws');
+                  ws.onmessage = function (e) {
+                    try { applyState(JSON.parse(e.data)); } catch (err) {}
+                  };
+                  ws.onclose = function () { setTimeout(connect, 1000); };
+                  ws.onerror = function () { ws.close(); };
+                }
+                connect();
               })();
               </script>
             </body>
@@ -569,16 +634,22 @@ class MediaHttpServer(
         // this page's own controls/playlist stop being relevant the moment /remote is used.
         val remoteFollowScript = if (isFolderMode) {
             """
-                (function pollRemote() {
-                  function poll() {
-                    fetch('/remote/state').then(function (r) { return r.json(); }).then(function (state) {
-                      if (state.videoId !== null) {
-                        location.href = '/watch?id=' + state.videoId + '&remote=1';
-                      }
-                    }).catch(function () {});
+                (function connectRemoteFollow() {
+                  function applyState(state) {
+                    if (state.videoId !== null) {
+                      location.href = '/watch?id=' + state.videoId + '&remote=1';
+                    }
                   }
-                  poll();
-                  setInterval(poll, 1500);
+                  function connect() {
+                    var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+                    var ws = new WebSocket(proto + '//' + location.host + '/remote/ws');
+                    ws.onmessage = function (e) {
+                      try { applyState(JSON.parse(e.data)); } catch (err) {}
+                    };
+                    ws.onclose = function () { setTimeout(connect, 1000); };
+                    ws.onerror = function () { ws.close(); };
+                  }
+                  connect();
                 })();
             """.trimIndent()
         } else {
@@ -913,35 +984,41 @@ class MediaHttpServer(
                 var lastSeekRevision = ${baseline.seekRevision};
                 var player = videojs('player', { autoplay: true, controls: false });
 
-                function poll() {
-                  fetch('/remote/state').then(function (r) { return r.json(); }).then(function (state) {
-                    if (state.videoId === null) {
-                      // The remote's been cleared — hand control back to a normal watch page
-                      // with its own controls instead of sitting on a bare screen forever.
-                      location.href = '/watch?id=' + currentId;
-                      return;
-                    }
-                    if (state.videoId !== currentId) {
-                      currentId = state.videoId;
-                      lastPlayRevision = state.playRevision;
-                      lastSeekRevision = state.seekRevision;
-                      player.poster('/thumbnail?id=' + state.videoId);
-                      player.src({ src: '/video?id=' + state.videoId, type: videoTypes[state.videoId] || 'video/mp4' });
-                      player.play().catch(function () {});
-                      return;
-                    }
-                    if (state.playRevision !== lastPlayRevision) {
-                      lastPlayRevision = state.playRevision;
-                      if (state.playing) player.play().catch(function () {}); else player.pause();
-                    }
-                    if (state.seekRevision !== lastSeekRevision) {
-                      lastSeekRevision = state.seekRevision;
-                      if (state.seekSeconds !== null) player.currentTime(state.seekSeconds);
-                    }
-                  }).catch(function () {});
+                function applyState(state) {
+                  if (state.videoId === null) {
+                    // The remote's been cleared — hand control back to a normal watch page
+                    // with its own controls instead of sitting on a bare screen forever.
+                    location.href = '/watch?id=' + currentId;
+                    return;
+                  }
+                  if (state.videoId !== currentId) {
+                    currentId = state.videoId;
+                    lastPlayRevision = state.playRevision;
+                    lastSeekRevision = state.seekRevision;
+                    player.poster('/thumbnail?id=' + state.videoId);
+                    player.src({ src: '/video?id=' + state.videoId, type: videoTypes[state.videoId] || 'video/mp4' });
+                    player.play().catch(function () {});
+                    return;
+                  }
+                  if (state.playRevision !== lastPlayRevision) {
+                    lastPlayRevision = state.playRevision;
+                    if (state.playing) player.play().catch(function () {}); else player.pause();
+                  }
+                  if (state.seekRevision !== lastSeekRevision) {
+                    lastSeekRevision = state.seekRevision;
+                    if (state.seekSeconds !== null) player.currentTime(state.seekSeconds);
+                  }
                 }
-                poll();
-                setInterval(poll, 1500);
+                function connect() {
+                  var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+                  var ws = new WebSocket(proto + '//' + location.host + '/remote/ws');
+                  ws.onmessage = function (e) {
+                    try { applyState(JSON.parse(e.data)); } catch (err) {}
+                  };
+                  ws.onclose = function () { setTimeout(connect, 1000); };
+                  ws.onerror = function () { ws.close(); };
+                }
+                connect();
               })();
               </script>
             </body>
@@ -1218,30 +1295,37 @@ class MediaHttpServer(
                   });
                 }
 
-                function poll() {
-                  fetch('/remote/state').then(function (r) { return r.json(); }).then(function (state) {
-                    if (state.videoId !== initialVideoId) {
-                      location.reload();
-                      return;
-                    }
-                    if (!player) return;
-                    if (state.playRevision !== lastPlayRevision) {
-                      lastPlayRevision = state.playRevision;
+                function applyState(state) {
+                  if (state.videoId !== initialVideoId) {
+                    location.reload();
+                    return;
+                  }
+                  if (!player) return;
+                  if (state.playRevision !== lastPlayRevision) {
+                    lastPlayRevision = state.playRevision;
+                    applyingRemote = true;
+                    if (state.playing) player.play().catch(function () {}); else player.pause();
+                    setTimeout(function () { applyingRemote = false; }, 400);
+                  }
+                  if (state.seekRevision !== lastSeekRevision) {
+                    lastSeekRevision = state.seekRevision;
+                    if (state.seekSeconds !== null) {
                       applyingRemote = true;
-                      if (state.playing) player.play().catch(function () {}); else player.pause();
+                      player.currentTime = state.seekSeconds;
                       setTimeout(function () { applyingRemote = false; }, 400);
                     }
-                    if (state.seekRevision !== lastSeekRevision) {
-                      lastSeekRevision = state.seekRevision;
-                      if (state.seekSeconds !== null) {
-                        applyingRemote = true;
-                        player.currentTime = state.seekSeconds;
-                        setTimeout(function () { applyingRemote = false; }, 400);
-                      }
-                    }
-                  }).catch(function () {});
+                  }
                 }
-                setInterval(poll, 1500);
+                function connectWs() {
+                  var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+                  var ws = new WebSocket(proto + '//' + location.host + '/remote/ws');
+                  ws.onmessage = function (e) {
+                    try { applyState(JSON.parse(e.data)); } catch (err) {}
+                  };
+                  ws.onclose = function () { setTimeout(connectWs, 1000); };
+                  ws.onerror = function () { ws.close(); };
+                }
+                connectWs();
               })();
               </script>
             </body>
@@ -1257,9 +1341,10 @@ class MediaHttpServer(
         return response
     }
 
-    private fun remoteStateJson(): Response {
+    /** Shared by the `/remote/state` HTTP fallback and every `/remote/ws` push. */
+    private fun remoteStateJsonString(): String {
         val state = remoteSelection.get()
-        val json = "{" +
+        return "{" +
             "\"videoId\":${state.videoId ?: "null"}," +
             "\"revision\":${state.revision}," +
             "\"playing\":${state.playing}," +
@@ -1267,7 +1352,10 @@ class MediaHttpServer(
             "\"seekSeconds\":${state.seekSeconds ?: "null"}," +
             "\"seekRevision\":${state.seekRevision}" +
             "}"
-        val response = newFixedLengthResponse(Response.Status.OK, "application/json", json)
+    }
+
+    private fun remoteStateJson(): Response {
+        val response = newFixedLengthResponse(Response.Status.OK, "application/json", remoteStateJsonString())
         response.addHeader("Cache-Control", "no-store")
         return response
     }
@@ -1290,6 +1378,7 @@ class MediaHttpServer(
                 seekRevision = it.seekRevision
             )
         }
+        broadcastRemoteState()
         return newFixedLengthResponse(Response.Status.OK, "text/plain", "OK")
     }
 
@@ -1308,6 +1397,7 @@ class MediaHttpServer(
             }
             else -> return newFixedLengthResponse(Response.Status.BAD_REQUEST, "text/plain", "Unknown action")
         }
+        broadcastRemoteState()
         return newFixedLengthResponse(Response.Status.OK, "text/plain", "OK")
     }
 
@@ -1317,6 +1407,7 @@ class MediaHttpServer(
      */
     private fun handleRemoteClear(): Response {
         remoteSelection.updateAndGet { RemoteSelection(revision = it.revision + 1, playRevision = it.playRevision + 1) }
+        broadcastRemoteState()
         return newFixedLengthResponse(Response.Status.OK, "text/plain", "OK")
     }
 

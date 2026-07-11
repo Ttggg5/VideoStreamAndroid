@@ -373,13 +373,36 @@ class MediaHttpServer(
         } else {
             ""
         }
-        val prevOverlayButton = if (showPlaylist) {
-            "<button type=\"button\" id=\"prevBtn\" class=\"navOverlayBtn navPrev\" title=\"Previous video\">&#8249;</button>"
-        } else {
-            ""
-        }
-        val nextOverlayButton = if (showPlaylist) {
-            "<button type=\"button\" id=\"nextBtn\" class=\"navOverlayBtn navNext\" title=\"Next video\">&#8250;</button>"
+        // Prev/Next are inserted into video.js's own control bar (next to the play button)
+        // via JS after the player initializes, rather than rendered as static HTML here —
+        // see navButtonsScript below.
+        val navButtonsScript = if (showPlaylist) {
+            """
+                var controlBar = player.controlBar && player.controlBar.el();
+                var playToggleEl = player.controlBar &&
+                  player.controlBar.getChild('playToggle') &&
+                  player.controlBar.getChild('playToggle').el();
+                if (controlBar && playToggleEl) {
+                  var makeNavButton = function (id, symbol, label) {
+                    var btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.id = id;
+                    btn.className = 'vjs-control vjs-button vjs-nav-button';
+                    btn.title = label;
+                    btn.setAttribute('aria-label', label);
+                    var span = document.createElement('span');
+                    span.className = 'vjs-nav-icon';
+                    span.setAttribute('aria-hidden', 'true');
+                    span.textContent = symbol;
+                    btn.appendChild(span);
+                    return btn;
+                  };
+                  prevBtn = makeNavButton('prevBtn', '‹', 'Previous video');
+                  nextBtn = makeNavButton('nextBtn', '›', 'Next video');
+                  controlBar.insertBefore(prevBtn, playToggleEl);
+                  controlBar.insertBefore(nextBtn, playToggleEl.nextSibling);
+                }
+            """.trimIndent()
         } else {
             ""
         }
@@ -410,7 +433,7 @@ class MediaHttpServer(
                 }
                 .toggle:has(input:checked) { background: var(--accent); color: #fff; }
                 .main { flex: 1; display: flex; min-height: 0; }
-                .player { flex: 1; position: relative; background: #000; min-width: 0; }
+                .player { flex: 1; background: #000; min-width: 0; }
                 .video-js { width: 100%; height: 100%; }
                 .video-js .vjs-tech { object-fit: contain; }
                 /* Re-skins video.js's default look (grey-blue box skin) to match this app's
@@ -455,28 +478,20 @@ class MediaHttpServer(
                   background-color: var(--accent);
                   color: #fff;
                 }
-                .navOverlayBtn {
-                  position: absolute;
-                  top: 50%;
-                  transform: translateY(-50%);
-                  width: 44px;
-                  height: 44px;
-                  border-radius: 50%;
-                  border: none;
-                  background: rgba(0, 0, 0, 0.45);
-                  color: #fff;
-                  font-size: 24px;
-                  line-height: 1;
-                  cursor: pointer;
+                /* Prev/Next live inside video.js's own control bar (see navButtonsScript),
+                   right next to the play button, styled to match its other controls. */
+                .video-js .vjs-nav-button {
                   display: flex;
                   align-items: center;
                   justify-content: center;
-                  z-index: 2;
+                  cursor: pointer;
                 }
-                .navOverlayBtn:hover:not(:disabled) { background: rgba(0, 0, 0, 0.7); }
-                .navOverlayBtn:disabled { opacity: 0.25; cursor: default; }
-                .navPrev { left: 12px; }
-                .navNext { right: 12px; }
+                .video-js .vjs-nav-icon { font-size: 1.8em; line-height: 1; color: #fff; }
+                .video-js .vjs-nav-button:hover .vjs-nav-icon,
+                .video-js .vjs-nav-button:focus .vjs-nav-icon {
+                  color: var(--accent);
+                }
+                .video-js .vjs-nav-button:disabled { cursor: default; opacity: 0.35; }
                 .playlist { width: 280px; flex-shrink: 0; overflow-y: auto; border-left: 1px solid #222; list-style: none; margin: 0; padding: 0; }
                 .playlist li { display: flex; gap: 10px; align-items: center; padding: 8px 12px; cursor: pointer; border-radius: 10px; margin: 4px 6px; }
                 .playlist li:hover { background: #1c1f28; }
@@ -497,11 +512,9 @@ class MediaHttpServer(
               </div>
               <div class="main">
                 <div class="player">
-                  $prevOverlayButton
                   <video id="player" class="video-js vjs-big-play-centered" controls preload="auto" poster="/thumbnail?id=${entry.id}">
                     <source src="/video?id=${entry.id}" type="${guessVideoMimeType(entry.name)}">
                   </video>
-                  $nextOverlayButton
                 </div>
                 ${if (showPlaylist) "<ul class=\"playlist\" id=\"playlist\">$playlistItems</ul>" else ""}
               </div>
@@ -515,8 +528,8 @@ class MediaHttpServer(
                 var listEl = document.getElementById('playlist');
                 var autoplayCheckbox = document.getElementById('autoplayToggle');
                 var shuffleCheckbox = document.getElementById('shuffleToggle');
-                var prevBtn = document.getElementById('prevBtn');
-                var nextBtn = document.getElementById('nextBtn');
+                var prevBtn = null;
+                var nextBtn = null;
                 var shuffleQueue = [];
                 var playHistory = [];
 
@@ -628,6 +641,7 @@ class MediaHttpServer(
                   if (idx > 0) playItem(playlist[idx - 1].id, true, false);
                 }
 
+                $navButtonsScript
                 if (prevBtn) prevBtn.addEventListener('click', goPrev);
                 if (nextBtn) nextBtn.addEventListener('click', goNext);
 

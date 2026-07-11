@@ -254,12 +254,20 @@ class MediaHttpServerTest {
 
         val (_, beforeBody) = get(httpServer, "/remote")
         assertFalse("no floating panel before anything's picked", beforeBody.contains("class=\"controlPanel\""))
-        assertFalse("no reserved bottom padding before anything's picked", beforeBody.contains("hasControlPanel"))
+        // The CSS rule "body.hasControlPanel { ... }" is always present in the stylesheet —
+        // what must be absent here is the class actually applied to <body>.
+        assertFalse(
+            "no reserved bottom padding before anything's picked",
+            beforeBody.contains("<body class=\"hasControlPanel\">")
+        )
 
         post(httpServer, "/remote/select?id=1")
         val (_, afterBody) = get(httpServer, "/remote")
         assertTrue("control panel should float once a video is selected", afterBody.contains("class=\"controlPanel\""))
-        assertTrue("body should reserve space for the floating panel", afterBody.contains("hasControlPanel"))
+        assertTrue(
+            "body should reserve space for the floating panel",
+            afterBody.contains("<body class=\"hasControlPanel\">")
+        )
     }
 
     @Test

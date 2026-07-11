@@ -2,11 +2,10 @@ package com.videostream.local
 
 import android.content.Intent
 import android.os.Bundle
-import androidx.appcompat.app.AppCompatActivity
 import com.videostream.local.databinding.ActivityMainBinding
 
 /** Landing screen: choose whether this device hosts a stream or watches one. */
-class MainActivity : AppCompatActivity() {
+class MainActivity : BaseActivity() {
 
     private lateinit var binding: ActivityMainBinding
 
@@ -20,6 +19,9 @@ class MainActivity : AppCompatActivity() {
         }
         binding.watchButton.setOnClickListener {
             startActivity(Intent(this, WatchActivity::class.java))
+        }
+        binding.settingsButton.setOnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
         }
     }
 }

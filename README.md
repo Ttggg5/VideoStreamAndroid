@@ -15,7 +15,8 @@ with a built-in screen to open another device's stream.
   the system document picker (`ACTION_OPEN_DOCUMENT` / `ACTION_OPEN_DOCUMENT_TREE`)
   — no broad storage permission needed.
 - **Serve**: an embedded HTTP server ([NanoHTTPD](https://github.com/NanoHttpd/nanohttpd))
-  serves the video at `http://<phone-ip>:8080/video`, honoring HTTP
+  serves the video at `http://<phone-ip>:<port>/video` (port `8080` by
+  default, changeable in Settings), honoring HTTP
   `Range` requests (`Accept-Ranges: bytes` / `206 Partial Content`), so a
   browser's `<video>` tag or a media player can start playing immediately
   and seek around without re-downloading — this is progressive streaming,
@@ -80,10 +81,17 @@ with a built-in screen to open another device's stream.
   tablets (`sw600dp+`) every screen also gets wider side margins instead
   of stretching content edge-to-edge. Picking a file/folder and an
   in-progress stream both survive a rotation instead of resetting.
+- **Settings**: a gear icon on the landing screen opens **Accent
+  color** (six presets, applied as a runtime `ThemeOverlay` to every
+  screen — including the `--accent` color on the browse/watch web
+  pages), **Theme** (match system / light / dark), **Streaming port**
+  (default `8080`, used both when hosting and as the default port when
+  connecting to an address that doesn't specify one), and **Keep screen
+  on while watching**.
 
 Any modern browser plays the stream directly with a `<video>` tag —
 no app or plugin needed on the viewing device. Desktop media players like
-VLC can also open the `http://<ip>:8080/video` URL directly.
+VLC can also open the `http://<ip>:<port>/video` URL directly.
 
 ## Requirements
 
@@ -154,9 +162,13 @@ VLC can also open the `http://<ip>:8080/video` URL directly.
 
 ```
 app/src/main/java/com/videostream/local/
-  MainActivity.kt        Landing screen: choose Host or Watch
+  MainActivity.kt        Landing screen: choose Host, Watch, or Settings
   HostActivity.kt         Host UI: file/folder picker, start/stop, notification permission
   WatchActivity.kt        Viewer UI: NSD host discovery + address input + embedded WebView browser
+  SettingsActivity.kt      Accent color / theme / streaming port / keep-screen-on
+  BaseActivity.kt          Applies the saved accent color to every screen, recreating it if changed
+  AppSettings.kt           SharedPreferences-backed store for all Settings values
+  VideoStreamApplication.kt   Applies the saved light/dark mode on process start
   StreamingService.kt      Foreground service hosting the HTTP server; scans folders for videos
   MediaHttpServer.kt      NanoHTTPD server; serves a folder-structured browsing UI and byte-range video streaming
   ThumbnailUtil.kt         Extracts a downscaled JPEG preview frame from a video, used by both the server and HostActivity
@@ -249,7 +261,6 @@ plug in `r0adkll/upload-google-play` (or similar) once those secrets exist.
 
 ## Known limitations
 
-- The port (8080) isn't configurable from the UI yet.
 - One video (or one folder) at a time — starting a new stream replaces
   the previous one.
 - No authentication — anyone on the same LAN can open the stream URL.

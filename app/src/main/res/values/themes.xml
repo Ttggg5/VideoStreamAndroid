@@ -3,4 +3,26 @@
     <style name="Theme.VideoStreamLocal" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/brand_primary</item>
     </style>
+
+    <!-- Applied at runtime (AppSettings.applyAccentOverlay) on top of Theme.VideoStreamLocal,
+         one per Settings > Accent color choice. Each just swaps colorPrimary, which is enough
+         to retint every MaterialButton/MaterialCardView icon and highlight in the app. -->
+    <style name="ThemeOverlay.Accent.Indigo" parent="">
+        <item name="colorPrimary">#4A5FFF</item>
+    </style>
+    <style name="ThemeOverlay.Accent.Teal" parent="">
+        <item name="colorPrimary">#00BFA5</item>
+    </style>
+    <style name="ThemeOverlay.Accent.Purple" parent="">
+        <item name="colorPrimary">#9C27B0</item>
+    </style>
+    <style name="ThemeOverlay.Accent.Green" parent="">
+        <item name="colorPrimary">#43A047</item>
+    </style>
+    <style name="ThemeOverlay.Accent.Orange" parent="">
+        <item name="colorPrimary">#FB8C00</item>
+    </style>
+    <style name="ThemeOverlay.Accent.Rose" parent="">
+        <item name="colorPrimary">#E91E63</item>
+    </style>
 </resources>

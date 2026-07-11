@@ -45,4 +45,22 @@
     <string name="watch_discovery_title">Hosts on your network</string>
     <string name="watch_discovery_refresh">Search again</string>
     <string name="watch_discovery_empty">No hosts found yet — you can also enter the address manually below.</string>
+
+    <string name="settings">Settings</string>
+    <string name="settings_accent_color">Accent color</string>
+    <string name="accent_color_description">%1$s accent color</string>
+    <string name="accent_indigo">Indigo</string>
+    <string name="accent_teal">Teal</string>
+    <string name="accent_purple">Purple</string>
+    <string name="accent_green">Green</string>
+    <string name="accent_orange">Orange</string>
+    <string name="accent_rose">Rose</string>
+    <string name="settings_theme">Theme</string>
+    <string name="theme_system">Match system</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="settings_port">Streaming port</string>
+    <string name="settings_port_hint">Port (1024–65535)</string>
+    <string name="settings_port_helper">Used the next time you start streaming, and as the default port when connecting to a host without one in the address.</string>
+    <string name="settings_keep_screen_on">Keep screen on while watching</string>
 </resources>

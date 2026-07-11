@@ -151,8 +151,10 @@ class StreamingService : Service() {
             return
         }
 
+        val port = AppSettings.getHttpPort(this)
+        val accentHex = AppSettings.getAccentColor(this).hex
         val httpServer = MediaHttpServer(
-            HTTP_PORT, contentResolver, assets, entries, libraryLabel, isFolderMode, defaultSort
+            port, contentResolver, assets, entries, libraryLabel, isFolderMode, defaultSort, accentHex
         )
         try {
             httpServer.start(NANOHTTPD_TIMEOUT_MS, false)
@@ -165,7 +167,7 @@ class StreamingService : Service() {
 
         videoName.postValue(libraryLabel)
         val ip = NetworkUtils.getLocalIpAddress()
-        val url = if (ip != null) "http://$ip:$HTTP_PORT" else null
+        val url = if (ip != null) "http://$ip:$port" else null
         serverUrl.postValue(url)
         isStreaming.postValue(true)
         updateNotification(
@@ -176,7 +178,7 @@ class StreamingService : Service() {
         // Lets WatchActivity find this host automatically instead of requiring a typed-in
         // address; if registration fails for any reason (e.g. mDNS blocked on this network),
         // the URL above still works for manual connect.
-        registerNsdService(libraryLabel)
+        registerNsdService(libraryLabel, port)
     }
 
     private fun stopStreaming() {
@@ -210,12 +212,12 @@ class StreamingService : Service() {
     }
 
     /** Advertises this stream via mDNS/NSD so [WatchActivity] can discover it without a typed address. */
-    private fun registerNsdService(libraryLabel: String) {
+    private fun registerNsdService(libraryLabel: String, httpPort: Int) {
         val manager = (getSystemService(NSD_SERVICE) as? NsdManager) ?: return
         val info = NsdServiceInfo().apply {
             serviceName = "${libraryLabel.take(30)} (${Build.MODEL})".take(60)
             serviceType = NSD_SERVICE_TYPE
-            port = HTTP_PORT
+            port = httpPort
         }
         val listener = object : NsdManager.RegistrationListener {
             override fun onServiceRegistered(info: NsdServiceInfo) = Unit
@@ -296,7 +298,6 @@ class StreamingService : Service() {
         const val EXTRA_FOLDER_URI = "com.videostream.local.extra.FOLDER_URI"
         const val EXTRA_VIDEO_NAME = "com.videostream.local.extra.VIDEO_NAME"
         const val EXTRA_DEFAULT_SORT = "com.videostream.local.extra.DEFAULT_SORT"
-        const val HTTP_PORT = 8080
         const val DEFAULT_SORT_PARAM = "name"
         /** NSD/mDNS service type this app's streams advertise themselves under, for WatchActivity to discover. */
         const val NSD_SERVICE_TYPE = "_videostream._tcp."

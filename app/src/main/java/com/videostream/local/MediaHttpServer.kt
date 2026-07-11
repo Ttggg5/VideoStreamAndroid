@@ -33,7 +33,10 @@ class MediaHttpServer(
     private val libraryName: String,
     private val isFolderMode: Boolean,
     /** One of [SortMode]'s `param` values, used when a request doesn't specify `?sort=`. */
-    private val defaultSortParam: String
+    private val defaultSortParam: String,
+    /** The host's Settings > Accent color choice, as a "#RRGGBB" string; used as the `--accent`
+     *  CSS variable on the browse/watch pages, so a viewer's browser matches the host app's look. */
+    private val accentColorHex: String = "#4A5FFF"
 ) : NanoHTTPD(port) {
 
     // Keyed by VideoEntry.id. An empty array means extraction was already tried and failed,
@@ -274,7 +277,7 @@ class MediaHttpServer(
               <meta name="viewport" content="width=device-width, initial-scale=1">
               <title>${escapeHtml(title)}</title>
               <style>
-                :root { --accent: #4a5fff; }
+                :root { --accent: $accentColorHex; }
                 * { box-sizing: border-box; }
                 body {
                   margin: 0; padding: 24px; background: #111319; color: #eee;
@@ -416,7 +419,7 @@ class MediaHttpServer(
               <title>${escapeHtml(entry.name)}</title>
               <link href="/assets/videojs/video-js.min.css" rel="stylesheet">
               <style>
-                :root { --accent: #4a5fff; }
+                :root { --accent: $accentColorHex; }
                 * { box-sizing: border-box; }
                 html, body {
                   margin: 0; height: 100%; background: #111319; color: #eee;

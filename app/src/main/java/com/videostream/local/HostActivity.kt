@@ -15,14 +15,13 @@ import android.provider.OpenableColumns
 import android.view.View
 import android.widget.ArrayAdapter
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.os.BundleCompat
 import androidx.documentfile.provider.DocumentFile
 import com.videostream.local.databinding.ActivityHostBinding
 
 /** Lets the user pick a video file or a folder of videos and broadcast it to the local network. */
-class HostActivity : AppCompatActivity() {
+class HostActivity : BaseActivity() {
 
     private lateinit var binding: ActivityHostBinding
 

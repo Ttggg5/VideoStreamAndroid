@@ -8,6 +8,7 @@ import android.net.nsd.NsdServiceInfo
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
+import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceError
@@ -17,7 +18,6 @@ import android.webkit.WebViewClient
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.addCallback
-import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -30,7 +30,7 @@ import com.videostream.local.databinding.ActivityWatchBinding
  * typing an address manually and tapping Connect always works too, in case discovery doesn't
  * reach a particular network (e.g. some Wi-Fi hotspot configurations isolate multicast traffic).
  */
-class WatchActivity : AppCompatActivity() {
+class WatchActivity : BaseActivity() {
 
     private lateinit var binding: ActivityWatchBinding
     private lateinit var nsdManager: NsdManager
@@ -54,6 +54,10 @@ class WatchActivity : AppCompatActivity() {
         binding = ActivityWatchBinding.inflate(layoutInflater)
         setContentView(binding.root)
         nsdManager = getSystemService(Context.NSD_SERVICE) as NsdManager
+
+        if (AppSettings.getKeepScreenOnWhileWatching(this)) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
 
         binding.webView.settings.apply {
             // Required for the host's playlist / next-video-without-reload player script.
@@ -200,7 +204,7 @@ class WatchActivity : AppCompatActivity() {
         } ?: return null
 
         val host = uri.host?.takeIf { it.isNotBlank() } ?: return null
-        val port = if (uri.port != -1) uri.port else StreamingService.HTTP_PORT
+        val port = if (uri.port != -1) uri.port else AppSettings.getHttpPort(this)
         val path = uri.path.orEmpty()
         return "http://$host:$port$path"
     }

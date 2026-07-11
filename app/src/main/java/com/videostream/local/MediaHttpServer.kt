@@ -28,8 +28,11 @@ import java.util.concurrent.atomic.AtomicReference
  *
  * `/remote` is a second way to pick a video: instead of a viewer browsing and choosing for
  * themselves, whoever loads `/remote` (the host app's own screen, or any other browser on the
- * LAN) picks on everyone else's behalf, like a TV remote — every `/browse` and `/watch` page
- * polls `/remote/state` and follows along automatically once something's been selected there.
+ * LAN) picks on everyone else's behalf, like a TV remote, and gets a full transport control
+ * panel (play/pause/seek/volume) for whatever's currently selected. Every `/browse` and `/watch`
+ * page polls `/remote/state`, and once anything's been selected there, hands off entirely to a
+ * bare, control-less full-screen player that just follows along — no viewer keeps their own
+ * play/pause/seek controls once a remote is driving.
  */
 class MediaHttpServer(
     port: Int,
@@ -50,13 +53,23 @@ class MediaHttpServer(
     private val thumbnailCache = ConcurrentHashMap<Int, ByteArray>()
 
     /**
-     * The current `/remote` pick, if any. [revision] increments on every select so polling
-     * clients (browse/watch pages) can tell a genuinely new command apart from the one they
-     * already acted on, without needing to compare video IDs (the host might re-select the
-     * same video, e.g. to restart it for a viewer who just joined).
+     * The current `/remote` pick and playback state. [revision] increments on every select so
+     * polling clients (browse/watch pages) can tell a genuinely new command apart from the one
+     * they already acted on, without needing to compare video IDs (the host might re-select the
+     * same video, e.g. to restart it for a viewer who just joined). [playRevision]/[seekRevision]
+     * work the same way for play/pause and seek commands, so a bare, control-less viewer page
+     * (see [watchPage]'s `remote` mode) can apply each command exactly once instead of re-running
+     * `player.play()`/`.currentTime()` on every poll.
      */
-    private data class RemoteSelection(val videoId: Int?, val revision: Long)
-    private val remoteSelection = AtomicReference(RemoteSelection(null, 0))
+    private data class RemoteSelection(
+        val videoId: Int? = null,
+        val revision: Long = 0,
+        val playing: Boolean = true,
+        val playRevision: Long = 0,
+        val seekSeconds: Double? = null,
+        val seekRevision: Long = 0
+    )
+    private val remoteSelection = AtomicReference(RemoteSelection())
 
     /** The video.js JS/CSS bundle, read once from assets and served from memory. */
     private val bundledAssets: Map<String, Pair<String, ByteArray>> by lazy {
@@ -124,6 +137,7 @@ class MediaHttpServer(
             )
             "/remote/state" -> remoteStateJson()
             "/remote/select" -> handleRemoteSelect(session)
+            "/remote/command" -> handleRemoteCommand(session)
             else -> newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Not found")
         }
     }
@@ -143,7 +157,7 @@ class MediaHttpServer(
         if (!isFolderMode) {
             val single = entries.singleOrNull()
                 ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "No video available")
-            return watchPage(single, SortMode.NAME, flat = false)
+            return watchPage(single, SortMode.NAME, flat = false, remote = false)
         }
         // flat=false here is just the request's own starting point — browsePage's inline script
         // immediately redirects to the viewer's remembered preference if it differs.
@@ -155,7 +169,9 @@ class MediaHttpServer(
             ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Video not found")
         val sortMode = SortMode.fromParam(session.parameters["sort"]?.firstOrNull() ?: defaultSortParam)
         val flat = session.parameters["flat"]?.firstOrNull() == "1"
-        return watchPage(entry, sortMode, flat)
+        // /remote's control panel drives this viewer entirely — no local controls of its own.
+        val remote = isFolderMode && session.parameters["remote"]?.firstOrNull() == "1"
+        return watchPage(entry, sortMode, flat, remote)
     }
 
     private fun sortVideos(videos: List<VideoEntry>, sortMode: SortMode): List<VideoEntry> = when (sortMode) {
@@ -369,13 +385,15 @@ class MediaHttpServer(
                 $videoItems
               </ul>
               <script>
-              // Follows along if someone picks a video from /remote, the same as watchPage does —
-              // a no-op until the first /remote/select ever happens.
+              // Hands off to the bare, control-less player as soon as someone picks a video from
+              // /remote — a no-op until the first /remote/select ever happens. Once the remote's
+              // been used, browsing here would just get interrupted anyway, so this jumps
+              // straight to the page /remote is actually driving.
               (function () {
                 function poll() {
                   fetch('/remote/state').then(function (r) { return r.json(); }).then(function (state) {
                     if (state.videoId !== null) {
-                      location.href = '/watch?id=' + state.videoId + '&sort=${sortMode.param}&flat=${if (flat) "1" else "0"}';
+                      location.href = '/watch?id=' + state.videoId + '&remote=1';
                     }
                   }).catch(function () {});
                 }
@@ -389,7 +407,9 @@ class MediaHttpServer(
         return newFixedLengthResponse(Response.Status.OK, "text/html", html)
     }
 
-    private fun watchPage(entry: VideoEntry, sortMode: SortMode, flat: Boolean): Response {
+    private fun watchPage(entry: VideoEntry, sortMode: SortMode, flat: Boolean, remote: Boolean): Response {
+        if (remote) return bareRemotePlayerPage(entry)
+
         // The playlist is the other videos alongside this one — the same folder, or the whole
         // library when viewing flat — same scope the browse page would show, in the same sort
         // order.
@@ -462,18 +482,16 @@ class MediaHttpServer(
             ""
         }
         // Only meaningful in folder mode — a single streamed file has nothing else to switch to,
-        // and there'd be no /remote page for it to follow anyway.
+        // and there'd be no /remote page for it to follow anyway. Unlike the in-place playlist
+        // switching above, a remote pick hands off entirely to the bare, control-less player —
+        // this page's own controls/playlist stop being relevant the moment /remote is used.
         val remoteFollowScript = if (isFolderMode) {
             """
                 (function pollRemote() {
                   function poll() {
                     fetch('/remote/state').then(function (r) { return r.json(); }).then(function (state) {
-                      if (state.videoId !== null && state.videoId !== currentId) {
-                        if (indexOf(state.videoId) >= 0) {
-                          playItem(state.videoId, true, true);
-                        } else {
-                          location.href = '/watch?id=' + state.videoId;
-                        }
+                      if (state.videoId !== null) {
+                        location.href = '/watch?id=' + state.videoId + '&remote=1';
                       }
                     }).catch(function () {});
                   }
@@ -758,11 +776,93 @@ class MediaHttpServer(
     }
 
     /**
-     * A folder-navigation UI, like [browsePage], but tapping a video sends a `/remote/select`
-     * command instead of opening the player locally — this is the page a "remote control" device
-     * (the host app's own screen, or any other browser on the LAN) loads to choose what plays on
-     * every other connected viewer's [watchPage]/[browsePage], which poll `/remote/state` to
-     * follow along. Only meaningful in folder mode; a single streamed file has nothing to pick.
+     * A control-less full-bleed player: just the video, no topbar/back link/playlist/video.js
+     * control bar. This is where every `/browse`/`/watch` page hands off to once `/remote` has
+     * ever been used — from that point on, [remotePage] is the only thing driving playback, so
+     * this page has nothing of its own to offer a viewer besides the picture itself. It polls
+     * `/remote/state` the same as the full [watchPage], but applies play/pause/seek/video-switch
+     * commands directly to the player instead of only following video switches.
+     */
+    private fun bareRemotePlayerPage(entry: VideoEntry): Response {
+        val baseline = remoteSelection.get()
+        // The remote can pick any video in the whole library, not just this one's folder
+        // siblings, so (unlike watchPage's playlistJson) this needs every entry's MIME type.
+        val videoTypesJson = "{" + entries.joinToString(",") { "\"${it.id}\":${jsonString(guessVideoMimeType(it.name))}" } + "}"
+        val html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <title>${escapeHtml(entry.name)}</title>
+              <link href="/assets/videojs/video-js.min.css" rel="stylesheet">
+              <style>
+                * { box-sizing: border-box; }
+                html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+                .video-js { width: 100%; height: 100%; }
+                .video-js .vjs-tech { object-fit: contain; }
+                /* No controls of its own — playback is driven entirely by whoever's using
+                   /remote, so video.js's own UI chrome is hidden rather than just unused. */
+                .video-js .vjs-control-bar,
+                .video-js .vjs-big-play-button,
+                .video-js .vjs-loading-spinner,
+                .video-js .vjs-error-display {
+                  display: none !important;
+                }
+              </style>
+            </head>
+            <body>
+              <video id="player" class="video-js" preload="auto" poster="/thumbnail?id=${entry.id}">
+                <source src="/video?id=${entry.id}" type="${guessVideoMimeType(entry.name)}">
+              </video>
+              <script src="/assets/videojs/video.min.js"></script>
+              <script>
+              (function () {
+                var videoTypes = $videoTypesJson;
+                var currentId = ${entry.id};
+                var lastPlayRevision = ${baseline.playRevision};
+                var lastSeekRevision = ${baseline.seekRevision};
+                var player = videojs('player', { autoplay: true, controls: false });
+
+                function poll() {
+                  fetch('/remote/state').then(function (r) { return r.json(); }).then(function (state) {
+                    if (state.videoId === null) return;
+                    if (state.videoId !== currentId) {
+                      currentId = state.videoId;
+                      lastPlayRevision = state.playRevision;
+                      lastSeekRevision = state.seekRevision;
+                      player.poster('/thumbnail?id=' + state.videoId);
+                      player.src({ src: '/video?id=' + state.videoId, type: videoTypes[state.videoId] || 'video/mp4' });
+                      player.play().catch(function () {});
+                      return;
+                    }
+                    if (state.playRevision !== lastPlayRevision) {
+                      lastPlayRevision = state.playRevision;
+                      if (state.playing) player.play().catch(function () {}); else player.pause();
+                    }
+                    if (state.seekRevision !== lastSeekRevision) {
+                      lastSeekRevision = state.seekRevision;
+                      if (state.seekSeconds !== null) player.currentTime(state.seekSeconds);
+                    }
+                  }).catch(function () {});
+                }
+                poll();
+                setInterval(poll, 1500);
+              })();
+              </script>
+            </body>
+            </html>
+        """.trimIndent()
+        return newFixedLengthResponse(Response.Status.OK, "text/html", html)
+    }
+
+    /**
+     * The control panel: a player with full transport controls (play/pause/seek/volume/
+     * fullscreen) for the currently selected video, plus a folder-navigation UI below it to pick
+     * a different one. This is the page a "remote control" device (the host app's own screen, or
+     * any other browser on the LAN) loads — every other connected viewer's [watchPage] is a
+     * control-less display that just follows what happens here, polling `/remote/state`. Only
+     * meaningful in folder mode; a single streamed file has nothing to pick.
      */
     private fun remotePage(path: String, sortMode: SortMode): Response {
         if (!isFolderMode) {
@@ -773,6 +873,8 @@ class MediaHttpServer(
         val listing = computeListing(path, flat = false, sortMode)
             ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Folder not found")
         val (effectivePath, title, videos, subfolders) = listing
+        val current = remoteSelection.get()
+        val currentEntry = current.videoId?.let { id -> entries.firstOrNull { it.id == id } }
 
         val backLink = if (effectivePath.isNotEmpty()) {
             val parentPath = effectivePath.substringBeforeLast('/', "")
@@ -785,9 +887,10 @@ class MediaHttpServer(
             "<li><a href=\"/remote?path=${encodePath(childPath)}&sort=${sortMode.param}\">$folderIconSvg ${escapeHtml(folderName)}</a></li>"
         }
         val videoItems = videos.joinToString("\n") { entry ->
+            val selectedClass = if (entry.id == current.videoId) " selected" else ""
             """
             <li>
-              <button type="button" class="videoCard" data-id="${entry.id}">
+              <button type="button" class="videoCard$selectedClass" data-id="${entry.id}">
                 <span class="thumb">
                   <img src="/thumbnail?id=${entry.id}" loading="lazy" alt="">
                   <span class="play-badge">$playBadgeIconSvg</span>
@@ -809,6 +912,18 @@ class MediaHttpServer(
         } else {
             ""
         }
+        val playerSection = if (currentEntry != null) {
+            """
+            <div class="player">
+              <video id="player" class="video-js vjs-big-play-centered" controls preload="auto" poster="/thumbnail?id=${currentEntry.id}">
+                <source src="/video?id=${currentEntry.id}" type="${guessVideoMimeType(currentEntry.name)}">
+              </video>
+            </div>
+            <p id="nowPlaying" class="nowPlaying">${escapeHtml(currentEntry.name)}</p>
+            """.trimIndent()
+        } else {
+            """<p class="placeholder">Pick a video below to start controlling playback on every connected viewer.</p>"""
+        }
 
         val html = """
             <!DOCTYPE html>
@@ -817,6 +932,7 @@ class MediaHttpServer(
               <meta charset="utf-8">
               <meta name="viewport" content="width=device-width, initial-scale=1">
               <title>Remote: ${escapeHtml(title)}</title>
+              <link href="/assets/videojs/video-js.min.css" rel="stylesheet">
               <style>
                 :root { --accent: $accentColorHex; }
                 * { box-sizing: border-box; }
@@ -826,6 +942,23 @@ class MediaHttpServer(
                 }
                 h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -0.01em; }
                 .subtitle { margin: 0 0 16px; color: #888; font-size: 13px; }
+                .player { background: #000; border-radius: 12px; overflow: hidden; aspect-ratio: 16 / 9; margin-bottom: 8px; }
+                .video-js { width: 100%; height: 100%; }
+                .video-js .vjs-tech { object-fit: contain; }
+                .video-js .vjs-big-play-button {
+                  width: 64px; height: 64px; line-height: 64px; margin: -32px 0 0 -32px;
+                  font-size: 26px; border: none; border-radius: 50%;
+                  background-color: rgba(0, 0, 0, 0.55);
+                }
+                .video-js:hover .vjs-big-play-button,
+                .video-js .vjs-big-play-button:focus,
+                .video-js .vjs-big-play-button:hover { border: none; background-color: var(--accent); }
+                .video-js .vjs-control-bar { background-color: rgba(17, 19, 25, 0.85); }
+                .video-js .vjs-slider { background-color: rgba(255, 255, 255, 0.15); }
+                .video-js .vjs-play-progress, .video-js .vjs-volume-level { background-color: var(--accent); }
+                .video-js .vjs-load-progress div { background: rgba(74, 95, 255, 0.35); }
+                .nowPlaying { margin: 0 0 20px; font-size: 13px; color: #ccc; word-break: break-word; }
+                .placeholder { margin: 0 0 20px; padding: 32px; text-align: center; color: #888; background: #1c1f28; border-radius: 12px; }
                 .bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; font-size: 13px; }
                 .bar .label { color: #888; margin-right: 2px; }
                 .bar a, .bar .active {
@@ -865,7 +998,8 @@ class MediaHttpServer(
             </head>
             <body>
               <h1>${escapeHtml(title)}</h1>
-              <p class="subtitle">Tap a video to play it on every connected viewer.</p>
+              <p class="subtitle">Every connected viewer sees exactly what plays here — pick a video, then use the player controls to drive playback for everyone.</p>
+              $playerSection
               <ul class="folders">
                 $backLink
                 $folderItems
@@ -874,31 +1008,67 @@ class MediaHttpServer(
               <ul class="videos">
                 $videoItems
               </ul>
+              <script src="/assets/videojs/video.min.js"></script>
               <script>
               (function () {
-                var currentSelected = null;
-                function applySelected(id) {
-                  currentSelected = id;
-                  var cards = document.querySelectorAll('.videoCard');
-                  for (var i = 0; i < cards.length; i++) {
-                    var match = parseInt(cards[i].getAttribute('data-id'), 10) === id;
-                    cards[i].classList.toggle('selected', match);
-                  }
+                var initialVideoId = ${currentEntry?.id ?: "null"};
+                var lastPlayRevision = ${current.playRevision};
+                var lastSeekRevision = ${current.seekRevision};
+                var player = document.getElementById('player') ? videojs('player', { autoplay: true }) : null;
+                // Set while applying a command that arrived from /remote/state, so the player
+                // events that fire as a side effect don't get echoed straight back as a new
+                // command — otherwise every incoming play/pause/seek would immediately re-send
+                // itself (and, with more than one /remote open, the two could fight forever).
+                var applyingRemote = false;
+
+                if (player) {
+                  player.on('play', function () {
+                    if (applyingRemote) return;
+                    fetch('/remote/command?action=play', { method: 'POST' }).catch(function () {});
+                  });
+                  player.on('pause', function () {
+                    if (applyingRemote) return;
+                    fetch('/remote/command?action=pause', { method: 'POST' }).catch(function () {});
+                  });
+                  player.on('seeked', function () {
+                    if (applyingRemote) return;
+                    fetch('/remote/command?action=seek&position=' + player.currentTime(), { method: 'POST' }).catch(function () {});
+                  });
                 }
-                function poll() {
-                  fetch('/remote/state').then(function (r) { return r.json(); }).then(function (state) {
-                    if (state.videoId !== currentSelected) applySelected(state.videoId);
-                  }).catch(function () {});
-                }
+
                 var cards = document.querySelectorAll('.videoCard');
                 for (var i = 0; i < cards.length; i++) {
                   cards[i].addEventListener('click', function () {
                     var id = parseInt(this.getAttribute('data-id'), 10);
-                    applySelected(id);
-                    fetch('/remote/select?id=' + id, { method: 'POST' }).catch(function () {});
+                    fetch('/remote/select?id=' + id, { method: 'POST' }).then(function () {
+                      location.reload();
+                    }).catch(function () {});
                   });
                 }
-                poll();
+
+                function poll() {
+                  fetch('/remote/state').then(function (r) { return r.json(); }).then(function (state) {
+                    if (state.videoId !== initialVideoId) {
+                      location.reload();
+                      return;
+                    }
+                    if (!player) return;
+                    if (state.playRevision !== lastPlayRevision) {
+                      lastPlayRevision = state.playRevision;
+                      applyingRemote = true;
+                      if (state.playing) player.play().catch(function () {}); else player.pause();
+                      setTimeout(function () { applyingRemote = false; }, 400);
+                    }
+                    if (state.seekRevision !== lastSeekRevision) {
+                      lastSeekRevision = state.seekRevision;
+                      if (state.seekSeconds !== null) {
+                        applyingRemote = true;
+                        player.currentTime(state.seekSeconds);
+                        setTimeout(function () { applyingRemote = false; }, 400);
+                      }
+                    }
+                  }).catch(function () {});
+                }
                 setInterval(poll, 1500);
               })();
               </script>
@@ -910,7 +1080,14 @@ class MediaHttpServer(
 
     private fun remoteStateJson(): Response {
         val state = remoteSelection.get()
-        val json = "{\"videoId\":${state.videoId ?: "null"},\"revision\":${state.revision}}"
+        val json = "{" +
+            "\"videoId\":${state.videoId ?: "null"}," +
+            "\"revision\":${state.revision}," +
+            "\"playing\":${state.playing}," +
+            "\"playRevision\":${state.playRevision}," +
+            "\"seekSeconds\":${state.seekSeconds ?: "null"}," +
+            "\"seekRevision\":${state.seekRevision}" +
+            "}"
         val response = newFixedLengthResponse(Response.Status.OK, "application/json", json)
         response.addHeader("Cache-Control", "no-store")
         return response
@@ -922,7 +1099,36 @@ class MediaHttpServer(
         if (entries.none { it.id == id }) {
             return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Video not found")
         }
-        remoteSelection.updateAndGet { RemoteSelection(id, it.revision + 1) }
+        // A fresh pick always starts playing from the top — any pending seek/pause from whatever
+        // was selected before no longer applies.
+        remoteSelection.updateAndGet {
+            RemoteSelection(
+                videoId = id,
+                revision = it.revision + 1,
+                playing = true,
+                playRevision = it.playRevision + 1,
+                seekSeconds = null,
+                seekRevision = it.seekRevision
+            )
+        }
+        return newFixedLengthResponse(Response.Status.OK, "text/plain", "OK")
+    }
+
+    /** Handles play/pause/seek commands from the control panel's player — see [remotePage]. */
+    private fun handleRemoteCommand(session: IHTTPSession): Response {
+        if (remoteSelection.get().videoId == null) {
+            return newFixedLengthResponse(Response.Status.BAD_REQUEST, "text/plain", "No video selected")
+        }
+        when (session.parameters["action"]?.firstOrNull()) {
+            "play" -> remoteSelection.updateAndGet { it.copy(playing = true, playRevision = it.playRevision + 1) }
+            "pause" -> remoteSelection.updateAndGet { it.copy(playing = false, playRevision = it.playRevision + 1) }
+            "seek" -> {
+                val position = session.parameters["position"]?.firstOrNull()?.toDoubleOrNull()
+                    ?: return newFixedLengthResponse(Response.Status.BAD_REQUEST, "text/plain", "Missing or invalid position")
+                remoteSelection.updateAndGet { it.copy(seekSeconds = position, seekRevision = it.seekRevision + 1) }
+            }
+            else -> return newFixedLengthResponse(Response.Status.BAD_REQUEST, "text/plain", "Unknown action")
+        }
         return newFixedLengthResponse(Response.Status.OK, "text/plain", "OK")
     }
 

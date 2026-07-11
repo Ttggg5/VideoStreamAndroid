@@ -63,18 +63,21 @@ with a built-in screen to open another device's stream.
   themselves, but for a folder stream there's a second way to pick a
   video — `/remote` (opened via a **Remote Control** button on the Host
   screen once a folder is streaming, or by loading `/remote` from any
-  other browser on the LAN) lets one device choose on everyone else's
-  behalf, like a TV remote. Tapping a video there calls `/remote/select`,
-  and every open `/browse`/`/watch` page polls `/remote/state` every 1.5
-  seconds and follows along automatically — jumping straight to that
-  video, in place if it's already in the current playlist, or by loading
-  the watch page otherwise. It's entirely additive: nothing changes for
-  anyone if `/remote` is never opened, and a viewer who'd rather keep
-  picking their own videos can just keep browsing normally (their page
-  will still jump if a remote selection comes in, the same as any other
-  viewer). `RemoteControlActivity` is a thin `WebView` wrapper the host
-  app uses to open its own `/remote` page without leaving the app; the
-  page itself works the same from any browser.
+  other browser on the LAN) lets one device drive playback for everyone
+  else, like an actual TV remote. `/remote` shows the folder browser plus
+  a full player with normal controls (play/pause/seek/volume/fullscreen)
+  for whatever's currently picked; tapping a video calls `/remote/select`,
+  and play/pause/seeking on that player calls `/remote/command`. Every
+  other open `/browse`/`/watch` page polls `/remote/state` every 1.5
+  seconds, and the moment anything's ever been picked there, hands off
+  entirely to a bare, full-screen player with **no controls of its own**
+  — it just shows whatever `/remote` is currently playing and follows
+  play/pause/seek/video-switch commands as they come in, since from that
+  point on `/remote` is the only thing driving playback. It's entirely
+  additive: nothing changes for anyone until `/remote` is used for the
+  first time. `RemoteControlActivity` is a thin `WebView` wrapper the
+  host app uses to open its own `/remote` page without leaving the app;
+  the page itself works the same from any browser.
 - **Stay alive**: the server runs inside a foreground `Service`, so
   streaming keeps going even if you switch away from the app (the
   notification shows the URL and has a Stop action).

@@ -223,4 +223,97 @@ class MediaHttpServerTest {
 
         assertEquals(404, code)
     }
+
+    @Test
+    fun `remote page shows a placeholder until a video is selected, then an embedded player`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true)
+
+        val (_, beforeBody) = get(httpServer, "/remote")
+        assertTrue("no video selected yet, so no player should be embedded", !beforeBody.contains("id=\"player\""))
+
+        post(httpServer, "/remote/select?id=1")
+        val (_, afterBody) = get(httpServer, "/remote")
+        assertTrue("selecting a video should embed a controllable player", afterBody.contains("id=\"player\""))
+    }
+
+    @Test
+    fun `remote command requires a video to already be selected`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true)
+
+        val (code, _) = post(httpServer, "/remote/command?action=play")
+
+        assertEquals(400, code)
+    }
+
+    @Test
+    fun `remote play and pause commands toggle playing state and bump playRevision`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true)
+        post(httpServer, "/remote/select?id=1")
+        val (_, afterSelect) = get(httpServer, "/remote/state")
+        assertTrue(afterSelect.contains("\"playing\":true"))
+
+        val (pauseCode, _) = post(httpServer, "/remote/command?action=pause")
+        assertEquals(200, pauseCode)
+        val (_, afterPause) = get(httpServer, "/remote/state")
+        assertTrue(afterPause.contains("\"playing\":false"))
+        assertFalse("pausing should bump playRevision", afterPause.contains("\"playRevision\":0"))
+
+        val (playCode, _) = post(httpServer, "/remote/command?action=play")
+        assertEquals(200, playCode)
+        val (_, afterPlay) = get(httpServer, "/remote/state")
+        assertTrue(afterPlay.contains("\"playing\":true"))
+    }
+
+    @Test
+    fun `remote seek command updates seekSeconds and bumps seekRevision`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true)
+        post(httpServer, "/remote/select?id=1")
+
+        val (seekCode, _) = post(httpServer, "/remote/command?action=seek&position=42.5")
+
+        assertEquals(200, seekCode)
+        val (_, body) = get(httpServer, "/remote/state")
+        assertTrue(body.contains("\"seekSeconds\":42.5"))
+        assertFalse("seeking should bump seekRevision", body.contains("\"seekRevision\":0"))
+    }
+
+    @Test
+    fun `remote command with an unknown action is rejected`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true)
+        post(httpServer, "/remote/select?id=1")
+
+        val (code, _) = post(httpServer, "/remote/command?action=nonsense")
+
+        assertEquals(400, code)
+    }
+
+    @Test
+    fun `following a remote pick lands on a bare player with no controls`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true)
+
+        val (code, body) = get(httpServer, "/watch?id=1&remote=1")
+
+        assertEquals(200, code)
+        assertTrue("bare player still needs a video element", body.contains("id=\"player\""))
+        assertTrue("bare player should disable video.js's own controls", body.contains("controls: false"))
+        assertFalse("bare player shouldn't offer a way back to browsing", body.contains("class=\"back\""))
+        assertFalse("bare player shouldn't show a playlist", body.contains("id=\"playlist\""))
+    }
+
+    @Test
+    fun `a normal watch page still has its own controls when not following a remote`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true)
+
+        val (code, body) = get(httpServer, "/watch?id=1")
+
+        assertEquals(200, code)
+        assertTrue(body.contains("controls preload"))
+    }
 }

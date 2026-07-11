@@ -66,12 +66,14 @@ with a built-in screen to open another device's stream.
   other browser on the LAN) lets one device drive playback for everyone
   else, like an actual TV remote. `/remote` is a **control panel, not a
   viewing screen**: it shows a "Now playing" card (thumbnail + title) and
-  transport controls (play/pause/seek) for whatever's currently picked,
-  but never the video picture itself, and stays muted — the video decodes
-  just enough to drive a real seek bar, since this device is controlling
-  the stream, not watching it. The folder browser sits below that; tapping
-  a video calls `/remote/select`, and using the transport controls calls
-  `/remote/command`. Every other open `/browse`/`/watch` page polls
+  transport controls (a plain play/pause button plus a range-input scrub
+  bar — no embedded video player UI of its own) for whatever's currently
+  picked, but never the video picture itself, and stays muted — the video
+  decodes in the background just enough to drive a real seek bar/duration,
+  since this device is controlling the stream, not watching it. The folder
+  browser sits below that; tapping a video calls `/remote/select`, and
+  using the transport controls calls `/remote/command`. Every other open
+  `/browse`/`/watch` page polls
   `/remote/state` every 1.5 seconds, and the moment anything's ever been
   picked there, hands off entirely to a bare, full-screen player with **no
   controls of its own** — it just shows whatever `/remote` is currently

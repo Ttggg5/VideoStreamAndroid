@@ -932,11 +932,15 @@ class MediaHttpServer(
               </div>
               <button type="button" id="exitRemoteButton" class="exitButton">Exit remote mode</button>
             </div>
-            <div class="player">
-              <video id="player" class="video-js" controls preload="auto">
-                <source src="/video?id=${currentEntry.id}" type="${guessVideoMimeType(currentEntry.name)}">
-              </video>
+            <div class="transportControls">
+              <button type="button" id="playPauseButton" class="ctrlButton" aria-label="Play or pause">&#9654;</button>
+              <span id="currentTimeLabel" class="timeLabel">0:00</span>
+              <input type="range" id="seekBar" class="seekBar" min="0" max="0" value="0" step="0.1">
+              <span id="durationLabel" class="timeLabel">0:00</span>
             </div>
+            <video id="player" class="hiddenVideo" muted autoplay playsinline preload="auto">
+              <source src="/video?id=${currentEntry.id}" type="${guessVideoMimeType(currentEntry.name)}">
+            </video>
             """.trimIndent()
         } else {
             """<p class="placeholder">Pick a video below to start controlling playback on every connected viewer.</p>"""
@@ -949,7 +953,6 @@ class MediaHttpServer(
               <meta charset="utf-8">
               <meta name="viewport" content="width=device-width, initial-scale=1">
               <title>Remote: ${escapeHtml(title)}</title>
-              <link href="/assets/videojs/video-js.min.css" rel="stylesheet">
               <style>
                 :root { --accent: $accentColorHex; }
                 * { box-sizing: border-box; }
@@ -973,34 +976,22 @@ class MediaHttpServer(
                 }
                 .exitButton:hover { background: #333846; }
                 /* This is a control panel, not a viewing screen — the video itself stays loaded
-                   (so the seek bar/duration are real) but its picture, poster, and anything else
-                   tied to actually watching it are hidden; only the transport controls show. */
-                .player { background: #1c1f28; border-radius: 12px; overflow: hidden; margin-bottom: 8px; }
-                .video-js { width: 100%; height: 40px; }
-                .video-js .vjs-tech,
-                .video-js .vjs-poster,
-                .video-js .vjs-big-play-button,
-                .video-js .vjs-fullscreen-control,
-                .video-js .vjs-volume-panel,
-                .video-js .vjs-loading-spinner {
-                  display: none !important;
+                   (so the seek bar/duration are real) but is never shown or heard; a plain
+                   button + range-input scrub bar drive it instead of an embedded video player's
+                   own on-screen controls. */
+                .hiddenVideo { display: none; }
+                .transportControls {
+                  display: flex; align-items: center; gap: 10px; padding: 10px 14px; margin-bottom: 8px;
+                  background: #1c1f28; border-radius: 12px;
                 }
-                /* !important: video.js's own stylesheet fades the control bar to invisible after
-                   a couple of seconds of inactivity (a `.vjs-user-inactive` rule with higher
-                   specificity than a plain override), which — with no video picture on this
-                   page for anyone to move the mouse over — would otherwise make the controls
-                   disappear for good shortly after picking a video. inactivityTimeout: 0 on the
-                   player itself (see below) is the primary fix; this is a belt-and-suspenders
-                   backstop in case that rule's specificity still wins somewhere. */
-                .video-js .vjs-control-bar,
-                .video-js.vjs-user-inactive .vjs-control-bar,
-                .video-js.vjs-user-inactive.vjs-playing .vjs-control-bar {
-                  position: relative; background-color: transparent; opacity: 1 !important;
-                  visibility: visible !important; height: 40px;
+                .ctrlButton {
+                  flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer;
+                  background: var(--accent); color: #fff; font-size: 15px; line-height: 1;
+                  display: flex; align-items: center; justify-content: center;
                 }
-                .video-js .vjs-slider { background-color: rgba(255, 255, 255, 0.15); }
-                .video-js .vjs-play-progress { background-color: var(--accent); }
-                .video-js .vjs-load-progress div { background: rgba(74, 95, 255, 0.35); }
+                .ctrlButton:hover { opacity: 0.85; }
+                .timeLabel { flex-shrink: 0; width: 36px; font-size: 12px; color: #ccc; text-align: center; }
+                .seekBar { flex: 1; accent-color: var(--accent); cursor: pointer; }
                 .placeholder { margin: 0 0 20px; padding: 32px; text-align: center; color: #888; background: #1c1f28; border-radius: 12px; }
                 .bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; font-size: 13px; }
                 .bar .label { color: #888; margin-right: 2px; }
@@ -1051,40 +1042,69 @@ class MediaHttpServer(
               <ul class="videos">
                 $videoItems
               </ul>
-              <script src="/assets/videojs/video.min.js"></script>
               <script>
               (function () {
                 var initialVideoId = ${currentEntry?.id ?: "null"};
                 var lastPlayRevision = ${current.playRevision};
                 var lastSeekRevision = ${current.seekRevision};
-                // Muted: this device is a remote, not a viewer — it decodes the video only to
-                // drive a real seek bar/duration, not to be watched or listened to itself.
-                // inactivityTimeout: 0 stops video.js fading the control bar to invisible after
-                // a couple of seconds of no mouse movement — normally fine for an actual video
-                // (moving the mouse over the picture wakes it back up), but there's no picture
-                // here for anyone to hover over, so the controls would otherwise vanish for good
-                // moments after picking a video.
-                var player = document.getElementById('player')
-                  ? videojs('player', { autoplay: true, muted: true, inactivityTimeout: 0 })
-                  : null;
+                // Muted: this device is a remote, not a viewer — the video decodes only to
+                // drive a real seek bar/duration, never to be watched or listened to itself.
+                // No player library here — a plain <video> plus a button and a range-input
+                // scrub bar, driven by the native media events, is the whole control panel.
+                var player = document.getElementById('player');
+                var playPauseButton = document.getElementById('playPauseButton');
+                var seekBar = document.getElementById('seekBar');
+                var currentTimeLabel = document.getElementById('currentTimeLabel');
+                var durationLabel = document.getElementById('durationLabel');
                 // Set while applying a command that arrived from /remote/state, so the player
                 // events that fire as a side effect don't get echoed straight back as a new
                 // command — otherwise every incoming play/pause/seek would immediately re-send
                 // itself (and, with more than one /remote open, the two could fight forever).
                 var applyingRemote = false;
+                // True while the seek bar is being dragged, so timeupdate doesn't fight the
+                // gesture by snapping the handle back to the actual playback position mid-drag.
+                var scrubbing = false;
+
+                function formatTime(seconds) {
+                  if (!isFinite(seconds) || seconds < 0) seconds = 0;
+                  var m = Math.floor(seconds / 60);
+                  var s = Math.floor(seconds % 60);
+                  return m + ':' + (s < 10 ? '0' : '') + s;
+                }
 
                 if (player) {
-                  player.on('play', function () {
+                  player.addEventListener('loadedmetadata', function () {
+                    seekBar.max = player.duration || 0;
+                    durationLabel.textContent = formatTime(player.duration);
+                  });
+                  player.addEventListener('timeupdate', function () {
+                    if (!scrubbing) seekBar.value = player.currentTime;
+                    currentTimeLabel.textContent = formatTime(player.currentTime);
+                  });
+                  player.addEventListener('play', function () {
+                    playPauseButton.innerHTML = '&#10074;&#10074;';
                     if (applyingRemote) return;
                     fetch('/remote/command?action=play', { method: 'POST' }).catch(function () {});
                   });
-                  player.on('pause', function () {
+                  player.addEventListener('pause', function () {
+                    playPauseButton.innerHTML = '&#9654;';
                     if (applyingRemote) return;
                     fetch('/remote/command?action=pause', { method: 'POST' }).catch(function () {});
                   });
-                  player.on('seeked', function () {
-                    if (applyingRemote) return;
-                    fetch('/remote/command?action=seek&position=' + player.currentTime(), { method: 'POST' }).catch(function () {});
+
+                  playPauseButton.addEventListener('click', function () {
+                    if (player.paused) player.play().catch(function () {}); else player.pause();
+                  });
+
+                  seekBar.addEventListener('input', function () {
+                    scrubbing = true;
+                    currentTimeLabel.textContent = formatTime(parseFloat(seekBar.value));
+                  });
+                  seekBar.addEventListener('change', function () {
+                    scrubbing = false;
+                    var position = parseFloat(seekBar.value);
+                    player.currentTime = position;
+                    fetch('/remote/command?action=seek&position=' + position, { method: 'POST' }).catch(function () {});
                   });
                 }
 
@@ -1124,7 +1144,7 @@ class MediaHttpServer(
                       lastSeekRevision = state.seekRevision;
                       if (state.seekSeconds !== null) {
                         applyingRemote = true;
-                        player.currentTime(state.seekSeconds);
+                        player.currentTime = state.seekSeconds;
                         setTimeout(function () { applyingRemote = false; }, 400);
                       }
                     }

@@ -318,20 +318,21 @@ class MediaHttpServerTest {
     }
 
     @Test
-    fun `remote page hides the video picture behind a control-only panel, with now-playing info`() {
+    fun `remote page hides the video picture behind a plain button-and-scrubbar control panel`() {
         val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
         val httpServer = startServer(entries, isFolderMode = true)
         post(httpServer, "/remote/select?id=1")
 
         val (_, body) = get(httpServer, "/remote")
 
-        assertTrue("host player should stay muted rather than play audio itself", body.contains("muted: true"))
-        assertTrue("video picture itself should be hidden, not shown", body.contains(".vjs-tech"))
+        assertTrue("host player should stay muted rather than play audio itself", body.contains("muted"))
+        assertTrue("video picture itself should be hidden, not shown", body.contains("class=\"hiddenVideo\""))
+        assertTrue("play/pause should be a plain button, not an embedded player's own UI", body.contains("id=\"playPauseButton\""))
+        assertTrue("scrubbing should be a plain range input, not an embedded player's own UI", body.contains("type=\"range\""))
         assertTrue("the currently playing video's name should be surfaced", body.contains("nowPlayingTitle"))
-        assertTrue(
-            "controls must not auto-hide after inactivity — there's no video picture here to " +
-                "move the mouse over to bring them back",
-            body.contains("inactivityTimeout: 0")
+        assertFalse(
+            "the control panel shouldn't pull in a video player library at all anymore",
+            body.contains("videojs(")
         )
     }
 

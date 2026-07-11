@@ -37,7 +37,7 @@
         <activity
             android:name=".WatchActivity"
             android:exported="false"
-            android:configChanges="keyboardHidden" />
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden" />
 
         <activity
             android:name=".RemoteControlActivity"

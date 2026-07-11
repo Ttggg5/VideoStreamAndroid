@@ -1,6 +1,7 @@
 package com.videostream.local
 
 import android.content.Context
+import android.content.res.Configuration
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.net.Uri
@@ -68,6 +69,9 @@ class WatchActivity : BaseActivity() {
     /** The videos [browseAdapter] is currently showing — the playlist scope for whichever one gets tapped. */
     private var currentVideos: List<RemoteVideo> = emptyList()
     private var browseAdapter: BrowseAdapter? = null
+    /** Mirrors [binding]'s browseTitle text so [reattachState] can restore it after a rotation
+     *  re-inflates the layout, without re-fetching the listing from the host. */
+    private var currentBrowseTitle: String = ""
 
     private var exoPlayer: ExoPlayer? = null
     private val playerListener = object : Player.Listener {
@@ -103,23 +107,7 @@ class WatchActivity : BaseActivity() {
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
 
-        binding.connectButton.setOnClickListener { connect() }
-        binding.addressInput.setOnEditorActionListener { _, actionId, event ->
-            val isGo = actionId == EditorInfo.IME_ACTION_GO
-            val isEnterDown = event != null && event.keyCode == KeyEvent.KEYCODE_ENTER &&
-                event.action == KeyEvent.ACTION_DOWN
-            if (isGo || isEnterDown) {
-                connect()
-                true
-            } else {
-                false
-            }
-        }
-        binding.discoveryRefreshButton.setOnClickListener { restartDiscovery() }
-
-        setUpBrowseSection()
-        setUpPlayerSection()
-        setUpWindowInsets()
+        setUpViews()
 
         onBackPressedDispatcher.addCallback(this) {
             when (screen) {
@@ -138,6 +126,82 @@ class WatchActivity : BaseActivity() {
         }
     }
 
+    /**
+     * Handled here (see the manifest's `android:configChanges` on this activity) instead of
+     * letting the framework recreate the whole Activity on rotation — a recreate tore down and
+     * reconnected everything, including the [ExoPlayer], so the video restarted from scratch on
+     * every rotate. Re-inflating the layout (picking up `layout-land` where relevant) and
+     * re-attaching the still-alive player/adapter/connection state instead keeps playback running
+     * straight through it.
+     */
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        binding = ActivityWatchBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        setUpViews()
+        reattachState()
+    }
+
+    /** Wires up listeners/layout managers against the current [binding] — called once from
+     *  [onCreate] and again from [onConfigurationChanged] every time the layout is re-inflated. */
+    private fun setUpViews() {
+        binding.connectButton.setOnClickListener { connect() }
+        binding.addressInput.setOnEditorActionListener { _, actionId, event ->
+            val isGo = actionId == EditorInfo.IME_ACTION_GO
+            val isEnterDown = event != null && event.keyCode == KeyEvent.KEYCODE_ENTER &&
+                event.action == KeyEvent.ACTION_DOWN
+            if (isGo || isEnterDown) {
+                connect()
+                true
+            } else {
+                false
+            }
+        }
+        binding.discoveryRefreshButton.setOnClickListener { restartDiscovery() }
+
+        setUpBrowseSection()
+        setUpPlayerSection()
+        setUpWindowInsets()
+    }
+
+    /**
+     * Re-attaches state that lives outside [binding] (the [browseAdapter]'s already-fetched
+     * items, the still-playing [exoPlayer], which screen was showing) to the layout that
+     * [onConfigurationChanged] just re-inflated, instead of re-fetching or restarting anything.
+     */
+    private fun reattachState() {
+        browseAdapter?.let { binding.browseRecyclerView.adapter = it }
+        exoPlayer?.let { binding.playerView.player = it }
+        binding.discoveryProgress.visibility = if (discoveryActive) View.VISIBLE else View.GONE
+        renderDiscoveredHosts()
+
+        binding.browseTitle.text = currentBrowseTitle
+        binding.browseFlatSwitch.isChecked = currentFlat
+        if ((browseAdapter?.itemCount ?: 0) > 0) {
+            binding.browseRecyclerView.visibility = View.VISIBLE
+        } else if (screen == Screen.BROWSE) {
+            binding.browseEmptyText.text = getString(R.string.watch_browse_empty)
+            binding.browseEmptyText.visibility = View.VISIBLE
+        }
+
+        val player = exoPlayer
+        if (player != null) {
+            binding.playerTitle.text = player.currentMediaItem?.mediaMetadata?.title ?: ""
+            val showPlaylistControls = player.mediaItemCount > 1 && !followingRemote
+            binding.playerAutoplaySwitch.visibility = if (showPlaylistControls) View.VISIBLE else View.GONE
+            binding.playerShuffleSwitch.visibility = if (showPlaylistControls) View.VISIBLE else View.GONE
+            binding.playerAutoplaySwitch.isChecked = !player.pauseAtEndOfMediaItems
+            binding.playerShuffleSwitch.isChecked = player.shuffleModeEnabled
+            applyControllerVisible(!followingRemote)
+        }
+
+        when (screen) {
+            Screen.PRE_CONNECT -> showPreConnect()
+            Screen.BROWSE -> showBrowse()
+            Screen.PLAYER -> showPlayer()
+        }
+    }
+
     private fun setUpBrowseSection() {
         val spanCount = resources.getInteger(R.integer.video_grid_span_count)
         binding.browseRecyclerView.layoutManager = GridLayoutManager(this, spanCount)
@@ -147,6 +211,10 @@ class WatchActivity : BaseActivity() {
             android.R.layout.simple_spinner_dropdown_item,
             arrayOf(getString(R.string.sort_name), getString(R.string.sort_date), getString(R.string.sort_size))
         )
+        // Set before attaching the listener below — a fresh Spinner otherwise fires
+        // onItemSelected for position 0 as soon as a listener's attached, which would reset
+        // back to "Name" (and reload) on every rotation whenever currentSort wasn't already that.
+        binding.browseSortSpinner.setSelection(SORT_VALUES.indexOf(currentSort).coerceAtLeast(0))
         binding.browseSortSpinner.setOnItemSelectedListener(object : AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 val newSort = SORT_VALUES.getOrElse(position) { SORT_VALUES[0] }
@@ -315,6 +383,7 @@ class WatchActivity : BaseActivity() {
         libraryInfo = null
         currentPath = ""
         currentVideos = emptyList()
+        currentBrowseTitle = ""
         // A reconnect might go to a different host — drop this one so ensureBrowseAdapter()
         // builds a fresh adapter bound to the new base URL instead of reusing this one's,
         // which would otherwise keep pointing thumbnails at the old host.
@@ -365,6 +434,7 @@ class WatchActivity : BaseActivity() {
                 currentPath = result.effectivePath
                 currentFlat = flat
                 currentVideos = result.videos
+                currentBrowseTitle = result.title
                 binding.browseTitle.text = result.title
                 binding.browseFlatSwitch.isChecked = flat
 
@@ -399,9 +469,6 @@ class WatchActivity : BaseActivity() {
             )
             browseAdapter = adapter
             binding.browseRecyclerView.adapter = adapter
-            val spanCount = resources.getInteger(R.integer.video_grid_span_count)
-            (binding.browseRecyclerView.layoutManager as GridLayoutManager).spanSizeLookup =
-                adapter.spanSizeLookup(spanCount)
         }
         return adapter
     }

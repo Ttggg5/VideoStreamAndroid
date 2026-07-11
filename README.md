@@ -127,7 +127,11 @@ with a built-in screen to open another device's stream.
   becomes a capped-width side panel instead of stretching full-width. On
   tablets (`sw600dp+`) every screen also gets wider side margins instead
   of stretching content edge-to-edge. Picking a file/folder and an
-  in-progress stream both survive a rotation instead of resetting.
+  in-progress stream both survive a rotation instead of resetting; on
+  `WatchActivity` specifically, rotation is handled in place (see below)
+  rather than by recreating the screen, so a playing video keeps playing
+  — same position, same instance — straight through the rotation instead
+  of restarting.
 - **Settings**: a gear icon on the landing screen opens **Accent
   color** (six presets, applied as a runtime `ThemeOverlay` to every
   screen — including the `--accent` color on the browse/watch web
@@ -226,7 +230,7 @@ app/src/main/java/com/videostream/local/
   WatchActivity.kt        Viewer UI: NSD host discovery, native folder/video browsing, ExoPlayer playback, /remote-follow
   RemoteLibraryApi.kt      Blocking HTTP/JSON client for a host's /api/info, /api/browse, /api/video, /remote/state
   RemoteStateSocket.kt     OkHttp WebSocket client for a host's /remote/ws — reconnecting real-time remote-state push
-  BrowseAdapter.kt         RecyclerView adapter mixing folder rows and video grid cells for WatchActivity's browse screen
+  BrowseAdapter.kt         RecyclerView adapter mixing folder and video cells (same thumbnail-tile card style) for WatchActivity's browse screen
   ThumbnailLoader.kt       Loads a host's /thumbnail?id=… images into ImageViews with a small in-memory cache
   RemoteControlActivity.kt   Thin WebView wrapper around this device's own /remote page (host-side control panel)
   SettingsActivity.kt      Accent color / theme / streaming port / keep-screen-on
@@ -357,10 +361,12 @@ plug in `r0adkll/upload-google-play` (or similar) once those secrets exist.
   both devices; some Wi-Fi hotspot implementations isolate clients from
   each other (AP/client isolation) and block it, so a discovered host
   may not always show up even when the manual address still works fine.
-- Rotating the device while **watching** a stream reconnects and
-  restores folder position/sort/flatten-view, but doesn't resume the
-  exact video playback position — that's live player state a
-  config-change recreation doesn't preserve, the same limitation the
-  previous WebView-based viewer had for the same reason. Picking a
-  file/folder on the **Host** screen and an in-progress stream itself
-  both survive rotation without resetting.
+- Rotating the device on the **Host** screen still recreates that
+  Activity (config-change recreation), but picking a file/folder and an
+  in-progress stream both survive it without resetting. `WatchActivity`
+  handles rotation itself instead (`android:configChanges` +
+  `onConfigurationChanged`) specifically so the `ExoPlayer` instance, the
+  playlist, and exact playback position are never torn down — a playing
+  video keeps playing straight through a rotation rather than reloading
+  from the start, the opposite of the old WebView-based viewer's behavior
+  (and this app's own earlier native version).

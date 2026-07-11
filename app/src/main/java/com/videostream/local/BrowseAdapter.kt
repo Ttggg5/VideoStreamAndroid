@@ -4,7 +4,6 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 
 /** One row/cell in the native folder-browsing grid — either a subfolder or a playable video. */
@@ -14,10 +13,10 @@ sealed class BrowseItem {
 }
 
 /**
- * Shows [BrowseItem.Folder]s as full-width rows and [BrowseItem.Video]s as thumbnail grid
- * cells in the same [RecyclerView] — the native equivalent of [browsePage]'s `ul.folders` list
- * above a `ul.videos` grid. Pair with [spanSizeLookup] on a [GridLayoutManager] so folder rows
- * span every column instead of being squeezed into one grid cell.
+ * Shows [BrowseItem.Folder]s and [BrowseItem.Video]s as matching thumbnail-tile grid cells
+ * (a 16:9 tile plus a title below — folders get a plain folder-icon tile in place of a real
+ * thumbnail) in the same [RecyclerView], so the grid reads as one consistent style instead of
+ * folders and videos looking like two different kinds of list.
  */
 class BrowseAdapter(
     private val baseUrl: String,
@@ -31,13 +30,6 @@ class BrowseAdapter(
         items = newItems
         notifyDataSetChanged()
     }
-
-    /** Attach to a [GridLayoutManager] so folder rows occupy the full width, not one cell. */
-    fun spanSizeLookup(spanCount: Int): GridLayoutManager.SpanSizeLookup =
-        object : GridLayoutManager.SpanSizeLookup() {
-            override fun getSpanSize(position: Int): Int =
-                if (items.getOrNull(position) is BrowseItem.Folder) spanCount else 1
-        }
 
     private class FolderViewHolder(itemView: android.view.View) : RecyclerView.ViewHolder(itemView) {
         val name: TextView = itemView.findViewById(R.id.folderName)

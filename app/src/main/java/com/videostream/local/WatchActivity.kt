@@ -550,7 +550,7 @@ class WatchActivity : BaseActivity() {
                 remoteFollowVideoId = state.videoId
                 lastPlayRevision = state.playRevision
                 lastSeekRevision = state.seekRevision
-                enterRemoteFollow(state.videoId, state.playing)
+                enterRemoteFollow(state.videoId, state.playing, state.positionSeconds)
                 return
             }
             if (remoteFollowLoading) return
@@ -571,7 +571,10 @@ class WatchActivity : BaseActivity() {
         }
     }
 
-    private fun enterRemoteFollow(videoId: Int, playing: Boolean) {
+    /** [positionSeconds] is the host's estimated current playback position — non-zero when
+     *  playback was already underway before this device joined, so it starts in roughly the
+     *  right spot instead of from the beginning. */
+    private fun enterRemoteFollow(videoId: Int, playing: Boolean, positionSeconds: Double) {
         val url = baseUrl ?: return
         followingRemote = true
         remoteFollowLoading = true
@@ -590,6 +593,7 @@ class WatchActivity : BaseActivity() {
                 player.pauseAtEndOfMediaItems = false
                 player.shuffleModeEnabled = false
                 player.setMediaItem(item)
+                if (positionSeconds > 0) player.seekTo((positionSeconds * 1000).toLong())
                 player.prepare()
                 player.playWhenReady = playing
                 binding.playerTitle.text = video?.name ?: ""

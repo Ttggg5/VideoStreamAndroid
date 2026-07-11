@@ -79,9 +79,25 @@ class MediaHttpServer(
         val playing: Boolean = true,
         val playRevision: Long = 0,
         val seekSeconds: Double? = null,
-        val seekRevision: Long = 0
+        val seekRevision: Long = 0,
+        /** Wall-clock bookkeeping so a viewer/control-panel connecting mid-playback can start
+         *  at roughly the right spot instead of position 0 — see [currentPositionSeconds].
+         *  Updated on every select/play/pause/seek; never broadcast as a seek command of its
+         *  own, so it doesn't disrupt anyone already following along. */
+        val positionBaseSeconds: Double = 0.0,
+        val positionBaseAtMs: Long = System.currentTimeMillis()
     )
     private val remoteSelection = AtomicReference(RemoteSelection())
+
+    /** Estimates where playback actually is right now by extrapolating from [RemoteSelection]'s
+     *  last known anchor — used only to give a freshly-connecting client a sane starting
+     *  position, not to drive already-connected followers (those stay in sync purely via
+     *  [RemoteSelection.seekRevision]/[RemoteSelection.playRevision] diffs). */
+    private fun currentPositionSeconds(state: RemoteSelection): Double {
+        if (!state.playing) return state.positionBaseSeconds
+        val elapsedSeconds = (System.currentTimeMillis() - state.positionBaseAtMs) / 1000.0
+        return (state.positionBaseSeconds + elapsedSeconds).coerceAtLeast(0.0)
+    }
 
     /** The video.js JS/CSS bundle, read once from assets and served from memory. */
     private val bundledAssets: Map<String, Pair<String, ByteArray>> by lazy {
@@ -983,6 +999,15 @@ class MediaHttpServer(
                 var lastPlayRevision = ${baseline.playRevision};
                 var lastSeekRevision = ${baseline.seekRevision};
                 var player = videojs('player', { autoplay: true, controls: false });
+                // If playback was already underway elsewhere before this viewer connected,
+                // start at the same spot instead of position 0 — and don't just rely on the
+                // autoplay attribute (silently failing leaves the poster thumbnail stuck on
+                // screen forever): explicitly seek and play once the player's ready.
+                player.ready(function () {
+                  var startAt = ${currentPositionSeconds(baseline)};
+                  if (startAt > 0) player.currentTime(startAt);
+                  player.play().catch(function () {});
+                });
 
                 function applyState(state) {
                   if (state.videoId === null) {
@@ -997,6 +1022,7 @@ class MediaHttpServer(
                     lastSeekRevision = state.seekRevision;
                     player.poster('/thumbnail?id=' + state.videoId);
                     player.src({ src: '/video?id=' + state.videoId, type: videoTypes[state.videoId] || 'video/mp4' });
+                    if (state.positionSeconds > 0) player.currentTime(state.positionSeconds);
                     player.play().catch(function () {});
                     return;
                   }
@@ -1146,8 +1172,14 @@ class MediaHttpServer(
                 /* This is a control panel, not a viewing screen — the video itself stays loaded
                    (so the seek bar/duration are real) but is never shown or heard; a plain
                    button + range-input scrub bar drive it instead of an embedded video player's
-                   own on-screen controls. */
-                .hiddenVideo { display: none; }
+                   own on-screen controls. display:none is deliberately avoided here — some
+                   browsers/WebViews throttle or refuse to actually play a display:none video,
+                   which is why the picture never showed up as "playing"; this keeps it laid out
+                   and decoding, just invisible and out of the way. */
+                .hiddenVideo {
+                  position: fixed; top: 0; left: 0; width: 1px; height: 1px;
+                  opacity: 0; pointer-events: none;
+                }
                 .transportControls {
                   display: flex; align-items: center; gap: 10px; padding: 10px 14px; margin-bottom: 8px;
                   background: #1c1f28; border-radius: 12px;
@@ -1215,6 +1247,10 @@ class MediaHttpServer(
                 var initialVideoId = ${currentEntry?.id ?: "null"};
                 var lastPlayRevision = ${current.playRevision};
                 var lastSeekRevision = ${current.seekRevision};
+                // If playback was already underway (another /remote panel started it, or this
+                // one's just being reloaded/reopened mid-video), start the scrub bar at the
+                // same spot instead of 0.
+                var initialPositionSeconds = ${currentPositionSeconds(current)};
                 // Muted: this device is a remote, not a viewer — the video decodes only to
                 // drive a real seek bar/duration, never to be watched or listened to itself.
                 // No player library here — a plain <video> plus a button and a range-input
@@ -1244,7 +1280,18 @@ class MediaHttpServer(
                   player.addEventListener('loadedmetadata', function () {
                     seekBar.max = player.duration || 0;
                     durationLabel.textContent = formatTime(player.duration);
+                    if (initialPositionSeconds > 0) {
+                      applyingRemote = true;
+                      player.currentTime = initialPositionSeconds;
+                      setTimeout(function () { applyingRemote = false; }, 400);
+                    }
                   });
+                  // Some browsers/WebViews don't reliably honor the plain autoplay attribute
+                  // for this off-screen driver video — kick it explicitly instead of hoping
+                  // the attribute alone starts playback.
+                  applyingRemote = true;
+                  player.play().catch(function () {});
+                  setTimeout(function () { applyingRemote = false; }, 400);
                   player.addEventListener('timeupdate', function () {
                     if (!scrubbing) seekBar.value = player.currentTime;
                     currentTimeLabel.textContent = formatTime(player.currentTime);
@@ -1350,7 +1397,8 @@ class MediaHttpServer(
             "\"playing\":${state.playing}," +
             "\"playRevision\":${state.playRevision}," +
             "\"seekSeconds\":${state.seekSeconds ?: "null"}," +
-            "\"seekRevision\":${state.seekRevision}" +
+            "\"seekRevision\":${state.seekRevision}," +
+            "\"positionSeconds\":${currentPositionSeconds(state)}" +
             "}"
     }
 
@@ -1375,7 +1423,9 @@ class MediaHttpServer(
                 playing = true,
                 playRevision = it.playRevision + 1,
                 seekSeconds = null,
-                seekRevision = it.seekRevision
+                seekRevision = it.seekRevision,
+                positionBaseSeconds = 0.0,
+                positionBaseAtMs = System.currentTimeMillis()
             )
         }
         broadcastRemoteState()
@@ -1388,12 +1438,29 @@ class MediaHttpServer(
             return newFixedLengthResponse(Response.Status.BAD_REQUEST, "text/plain", "No video selected")
         }
         when (session.parameters["action"]?.firstOrNull()) {
-            "play" -> remoteSelection.updateAndGet { it.copy(playing = true, playRevision = it.playRevision + 1) }
-            "pause" -> remoteSelection.updateAndGet { it.copy(playing = false, playRevision = it.playRevision + 1) }
+            // Resuming: keep the paused position as the timeline anchor, just restart its clock.
+            "play" -> remoteSelection.updateAndGet {
+                it.copy(playing = true, playRevision = it.playRevision + 1, positionBaseAtMs = System.currentTimeMillis())
+            }
+            "pause" -> remoteSelection.updateAndGet {
+                it.copy(
+                    playing = false,
+                    playRevision = it.playRevision + 1,
+                    positionBaseSeconds = currentPositionSeconds(it),
+                    positionBaseAtMs = System.currentTimeMillis()
+                )
+            }
             "seek" -> {
                 val position = session.parameters["position"]?.firstOrNull()?.toDoubleOrNull()
                     ?: return newFixedLengthResponse(Response.Status.BAD_REQUEST, "text/plain", "Missing or invalid position")
-                remoteSelection.updateAndGet { it.copy(seekSeconds = position, seekRevision = it.seekRevision + 1) }
+                remoteSelection.updateAndGet {
+                    it.copy(
+                        seekSeconds = position,
+                        seekRevision = it.seekRevision + 1,
+                        positionBaseSeconds = position,
+                        positionBaseAtMs = System.currentTimeMillis()
+                    )
+                }
             }
             else -> return newFixedLengthResponse(Response.Status.BAD_REQUEST, "text/plain", "Unknown action")
         }

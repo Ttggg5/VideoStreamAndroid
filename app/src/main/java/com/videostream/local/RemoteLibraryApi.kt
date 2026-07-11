@@ -43,7 +43,11 @@ data class RemoteState(
     val playing: Boolean,
     val playRevision: Long,
     val seekSeconds: Double?,
-    val seekRevision: Long
+    val seekRevision: Long,
+    /** Where the host's playback actually is right now (extrapolated server-side), used only to
+     *  start a freshly-entered remote-follow at roughly the right spot instead of position 0 —
+     *  see [WatchActivity.enterRemoteFollow]. */
+    val positionSeconds: Double = 0.0
 )
 
 /**
@@ -133,7 +137,8 @@ object RemoteLibraryApi {
             playing = json.getBoolean("playing"),
             playRevision = json.getLong("playRevision"),
             seekSeconds = if (json.isNull("seekSeconds")) null else json.getDouble("seekSeconds"),
-            seekRevision = json.getLong("seekRevision")
+            seekRevision = json.getLong("seekRevision"),
+            positionSeconds = json.optDouble("positionSeconds", 0.0)
         )
     } catch (e: Exception) {
         null

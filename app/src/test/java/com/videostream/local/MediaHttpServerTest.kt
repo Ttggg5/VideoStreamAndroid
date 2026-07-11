@@ -291,6 +291,49 @@ class MediaHttpServerTest {
         assertFalse("seeking should bump seekRevision", body.contains("\"seekRevision\":0"))
     }
 
+    /** Extracts the `positionSeconds` value from a `/remote/state`-shaped JSON body. */
+    private fun positionSecondsOf(body: String): Double {
+        val match = Regex("\"positionSeconds\":([0-9.]+)").find(body)
+            ?: throw AssertionError("no positionSeconds field in: $body")
+        return match.groupValues[1].toDouble()
+    }
+
+    @Test
+    fun `positionSeconds freezes at the seeked spot once paused`() {
+        // positionSeconds keeps advancing with wall-clock time while playing (it's an
+        // extrapolation of elapsed real time, not a fixed value), so this only asserts it's
+        // close to the seeked position rather than exactly equal — small scheduling/network
+        // delays between the seek and pause commands are expected and harmless.
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true)
+        post(httpServer, "/remote/select?id=1")
+
+        post(httpServer, "/remote/command?action=seek&position=100")
+        post(httpServer, "/remote/command?action=pause")
+
+        val (_, afterPause) = get(httpServer, "/remote/state")
+        val positionAfterPause = positionSecondsOf(afterPause)
+        assertEquals(
+            "pausing right after a seek should freeze positionSeconds near the seeked spot",
+            100.0, positionAfterPause, 2.0
+        )
+
+        // Frozen while paused means it must not keep drifting forward on its own.
+        val (_, later) = get(httpServer, "/remote/state")
+        assertEquals(positionAfterPause, positionSecondsOf(later), 0.0)
+    }
+
+    @Test
+    fun `a freshly selected video starts at positionSeconds roughly zero`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true)
+
+        post(httpServer, "/remote/select?id=1")
+
+        val (_, body) = get(httpServer, "/remote/state")
+        assertEquals(0.0, positionSecondsOf(body), 2.0)
+    }
+
     @Test
     fun `remote command with an unknown action is rejected`() {
         val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))

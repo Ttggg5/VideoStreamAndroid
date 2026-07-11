@@ -8,6 +8,7 @@ import java.io.ByteArrayInputStream
 import java.io.FileInputStream
 import java.net.URLEncoder
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Serves one or more existing video files over HTTP with byte-range support, so a
@@ -24,6 +25,11 @@ import java.util.concurrent.ConcurrentHashMap
  * The player itself is [video.js](https://videojs.com), bundled under `assets/videojs/`
  * and served from `/assets/...` so playback works with no internet access — same as
  * everything else this server serves.
+ *
+ * `/remote` is a second way to pick a video: instead of a viewer browsing and choosing for
+ * themselves, whoever loads `/remote` (the host app's own screen, or any other browser on the
+ * LAN) picks on everyone else's behalf, like a TV remote — every `/browse` and `/watch` page
+ * polls `/remote/state` and follows along automatically once something's been selected there.
  */
 class MediaHttpServer(
     port: Int,
@@ -42,6 +48,15 @@ class MediaHttpServer(
     // Keyed by VideoEntry.id. An empty array means extraction was already tried and failed,
     // so a broken/DRM'd file isn't re-decoded on every thumbnail request.
     private val thumbnailCache = ConcurrentHashMap<Int, ByteArray>()
+
+    /**
+     * The current `/remote` pick, if any. [revision] increments on every select so polling
+     * clients (browse/watch pages) can tell a genuinely new command apart from the one they
+     * already acted on, without needing to compare video IDs (the host might re-select the
+     * same video, e.g. to restart it for a viewer who just joined).
+     */
+    private data class RemoteSelection(val videoId: Int?, val revision: Long)
+    private val remoteSelection = AtomicReference(RemoteSelection(null, 0))
 
     /** The video.js JS/CSS bundle, read once from assets and served from memory. */
     private val bundledAssets: Map<String, Pair<String, ByteArray>> by lazy {
@@ -103,6 +118,12 @@ class MediaHttpServer(
             "/watch" -> serveWatch(session)
             "/video" -> serveVideo(session)
             "/thumbnail" -> serveThumbnail(session)
+            "/remote" -> remotePage(
+                session.parameters["path"]?.firstOrNull().orEmpty(),
+                SortMode.fromParam(session.parameters["sort"]?.firstOrNull() ?: defaultSortParam)
+            )
+            "/remote/state" -> remoteStateJson()
+            "/remote/select" -> handleRemoteSelect(session)
             else -> newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Not found")
         }
     }
@@ -143,6 +164,41 @@ class MediaHttpServer(
         SortMode.SIZE -> videos.sortedByDescending { it.sizeBytes }
     }
 
+    /** Shared by [browsePage] and [remotePage] — the videos/subfolders directly inside [path]. */
+    private data class FolderListing(
+        val effectivePath: String,
+        val title: String,
+        val videos: List<VideoEntry>,
+        val subfolders: List<String>
+    )
+
+    /**
+     * Computes what [browsePage]/[remotePage] should show for [path]. When [flat] is on, [path]
+     * is ignored entirely and every video in the library is returned together. Returns null if
+     * there's nothing at [path] at all (a 404 either way).
+     */
+    private fun computeListing(path: String, flat: Boolean, sortMode: SortMode): FolderListing? {
+        val effectivePath = if (flat) "" else path
+        val prefix = if (effectivePath.isEmpty()) "" else "$effectivePath/"
+        val videos = if (flat) {
+            sortVideos(entries, sortMode)
+        } else {
+            sortVideos(entries.filter { it.folderPath == effectivePath }, sortMode)
+        }
+        val subfolders = if (flat) {
+            emptyList()
+        } else {
+            entries
+                .filter { it.folderPath != effectivePath && it.folderPath.startsWith(prefix) }
+                .map { it.folderPath.removePrefix(prefix).substringBefore('/') }
+                .distinct()
+                .sorted()
+        }
+        if (videos.isEmpty() && subfolders.isEmpty()) return null
+        val title = if (effectivePath.isEmpty()) libraryName else effectivePath.substringAfterLast('/')
+        return FolderListing(effectivePath, title, videos, subfolders)
+    }
+
     /**
      * Guesses a video's MIME type from its file extension, for the `<source type>` hint
      * video.js uses to pick a playback source — the actual `/video` response's real
@@ -171,28 +227,9 @@ class MediaHttpServer(
      * viewer's remembered `localStorage` preference across navigation.
      */
     private fun browsePage(path: String, sortMode: SortMode, flat: Boolean): Response {
-        val effectivePath = if (flat) "" else path
-        val prefix = if (effectivePath.isEmpty()) "" else "$effectivePath/"
-        val videos = if (flat) {
-            sortVideos(entries, sortMode)
-        } else {
-            sortVideos(entries.filter { it.folderPath == effectivePath }, sortMode)
-        }
-        val subfolders = if (flat) {
-            emptyList()
-        } else {
-            entries
-                .filter { it.folderPath != effectivePath && it.folderPath.startsWith(prefix) }
-                .map { it.folderPath.removePrefix(prefix).substringBefore('/') }
-                .distinct()
-                .sorted()
-        }
-
-        if (videos.isEmpty() && subfolders.isEmpty()) {
-            return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Folder not found")
-        }
-
-        val title = if (effectivePath.isEmpty()) libraryName else effectivePath.substringAfterLast('/')
+        val listing = computeListing(path, flat, sortMode)
+            ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Folder not found")
+        val (effectivePath, title, videos, subfolders) = listing
         val backLink = if (effectivePath.isNotEmpty()) {
             val parentPath = effectivePath.substringBeforeLast('/', "")
             "<li><a class=\"back\" href=\"/browse?path=${encodePath(parentPath)}&sort=${sortMode.param}\">$chevronLeftIconSvg ..</a></li>"
@@ -331,6 +368,21 @@ class MediaHttpServer(
               <ul class="videos">
                 $videoItems
               </ul>
+              <script>
+              // Follows along if someone picks a video from /remote, the same as watchPage does —
+              // a no-op until the first /remote/select ever happens.
+              (function () {
+                function poll() {
+                  fetch('/remote/state').then(function (r) { return r.json(); }).then(function (state) {
+                    if (state.videoId !== null) {
+                      location.href = '/watch?id=' + state.videoId + '&sort=${sortMode.param}&flat=${if (flat) "1" else "0"}';
+                    }
+                  }).catch(function () {});
+                }
+                poll();
+                setInterval(poll, 1500);
+              })();
+              </script>
             </body>
             </html>
         """.trimIndent()
@@ -405,6 +457,29 @@ class MediaHttpServer(
                   controlBar.insertBefore(prevBtn, playToggleEl);
                   controlBar.insertBefore(nextBtn, playToggleEl.nextSibling);
                 }
+            """.trimIndent()
+        } else {
+            ""
+        }
+        // Only meaningful in folder mode — a single streamed file has nothing else to switch to,
+        // and there'd be no /remote page for it to follow anyway.
+        val remoteFollowScript = if (isFolderMode) {
+            """
+                (function pollRemote() {
+                  function poll() {
+                    fetch('/remote/state').then(function (r) { return r.json(); }).then(function (state) {
+                      if (state.videoId !== null && state.videoId !== currentId) {
+                        if (indexOf(state.videoId) >= 0) {
+                          playItem(state.videoId, true, true);
+                        } else {
+                          location.href = '/watch?id=' + state.videoId;
+                        }
+                      }
+                    }).catch(function () {});
+                  }
+                  poll();
+                  setInterval(poll, 1500);
+                })();
             """.trimIndent()
         } else {
             ""
@@ -672,12 +747,183 @@ class MediaHttpServer(
                     playItem(e.state.id, false, false);
                   }
                 });
+
+                $remoteFollowScript
               })();
               </script>
             </body>
             </html>
         """.trimIndent()
         return newFixedLengthResponse(Response.Status.OK, "text/html", html)
+    }
+
+    /**
+     * A folder-navigation UI, like [browsePage], but tapping a video sends a `/remote/select`
+     * command instead of opening the player locally — this is the page a "remote control" device
+     * (the host app's own screen, or any other browser on the LAN) loads to choose what plays on
+     * every other connected viewer's [watchPage]/[browsePage], which poll `/remote/state` to
+     * follow along. Only meaningful in folder mode; a single streamed file has nothing to pick.
+     */
+    private fun remotePage(path: String, sortMode: SortMode): Response {
+        if (!isFolderMode) {
+            return newFixedLengthResponse(
+                Response.Status.NOT_FOUND, "text/plain", "Remote control needs a hosted folder"
+            )
+        }
+        val listing = computeListing(path, flat = false, sortMode)
+            ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Folder not found")
+        val (effectivePath, title, videos, subfolders) = listing
+
+        val backLink = if (effectivePath.isNotEmpty()) {
+            val parentPath = effectivePath.substringBeforeLast('/', "")
+            "<li><a class=\"back\" href=\"/remote?path=${encodePath(parentPath)}&sort=${sortMode.param}\">$chevronLeftIconSvg ..</a></li>"
+        } else {
+            ""
+        }
+        val folderItems = subfolders.joinToString("\n") { folderName ->
+            val childPath = if (effectivePath.isEmpty()) folderName else "$effectivePath/$folderName"
+            "<li><a href=\"/remote?path=${encodePath(childPath)}&sort=${sortMode.param}\">$folderIconSvg ${escapeHtml(folderName)}</a></li>"
+        }
+        val videoItems = videos.joinToString("\n") { entry ->
+            """
+            <li>
+              <button type="button" class="videoCard" data-id="${entry.id}">
+                <span class="thumb">
+                  <img src="/thumbnail?id=${entry.id}" loading="lazy" alt="">
+                  <span class="play-badge">$playBadgeIconSvg</span>
+                </span>
+                <span class="title">${escapeHtml(entry.name)}</span>
+              </button>
+            </li>
+            """.trimIndent()
+        }
+        val sortLinks = SortMode.values().joinToString(" ") { mode ->
+            if (mode == sortMode) {
+                "<span class=\"active\">${mode.label}</span>"
+            } else {
+                "<a href=\"/remote?path=${encodePath(effectivePath)}&sort=${mode.param}\">${mode.label}</a>"
+            }
+        }
+        val sortBar = if (videos.size > 1) {
+            "<div class=\"bar\"><span class=\"label\">Sort:</span> $sortLinks</div>"
+        } else {
+            ""
+        }
+
+        val html = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <title>Remote: ${escapeHtml(title)}</title>
+              <style>
+                :root { --accent: $accentColorHex; }
+                * { box-sizing: border-box; }
+                body {
+                  margin: 0; padding: 24px; background: #111319; color: #eee;
+                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                }
+                h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -0.01em; }
+                .subtitle { margin: 0 0 16px; color: #888; font-size: 13px; }
+                .bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; font-size: 13px; }
+                .bar .label { color: #888; margin-right: 2px; }
+                .bar a, .bar .active {
+                  padding: 6px 14px; border-radius: 999px; text-decoration: none; font-size: 13px;
+                }
+                .bar a { color: #ccc; background: #1c1f28; }
+                .bar a:hover { background: #262a36; }
+                .bar .active { background: var(--accent); color: #fff; font-weight: 600; }
+                ul.folders { list-style: none; padding: 0; margin: 0 0 16px; }
+                ul.folders li { margin: 6px 0; }
+                ul.folders a {
+                  display: flex; align-items: center; gap: 10px; padding: 12px 16px;
+                  background: #1c1f28; color: #fff; text-decoration: none; border-radius: 12px;
+                  transition: background 0.15s ease;
+                }
+                ul.folders a:hover { background: #262a36; }
+                ul.folders a.back { color: #ccc; }
+                ul.videos {
+                  list-style: none; padding: 0; margin: 0; display: grid;
+                  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px;
+                }
+                .videoCard {
+                  display: flex; flex-direction: column; width: 100%; background: #1c1f28; color: #fff;
+                  border: 2px solid transparent; border-radius: 12px; overflow: hidden; padding: 0;
+                  font: inherit; text-align: left; cursor: pointer;
+                  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+                }
+                .videoCard:hover { background: #262a36; transform: translateY(-2px); }
+                .videoCard.selected { border-color: var(--accent); }
+                .videoCard .thumb { display: block; position: relative; background: #000; }
+                .videoCard .thumb img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+                .videoCard .play-badge {
+                  position: absolute; right: 6px; bottom: 6px; display: flex; opacity: 0.9;
+                }
+                .videoCard .title { display: block; padding: 8px; font-size: 13px; word-break: break-word; }
+              </style>
+            </head>
+            <body>
+              <h1>${escapeHtml(title)}</h1>
+              <p class="subtitle">Tap a video to play it on every connected viewer.</p>
+              <ul class="folders">
+                $backLink
+                $folderItems
+              </ul>
+              $sortBar
+              <ul class="videos">
+                $videoItems
+              </ul>
+              <script>
+              (function () {
+                var currentSelected = null;
+                function applySelected(id) {
+                  currentSelected = id;
+                  var cards = document.querySelectorAll('.videoCard');
+                  for (var i = 0; i < cards.length; i++) {
+                    var match = parseInt(cards[i].getAttribute('data-id'), 10) === id;
+                    cards[i].classList.toggle('selected', match);
+                  }
+                }
+                function poll() {
+                  fetch('/remote/state').then(function (r) { return r.json(); }).then(function (state) {
+                    if (state.videoId !== currentSelected) applySelected(state.videoId);
+                  }).catch(function () {});
+                }
+                var cards = document.querySelectorAll('.videoCard');
+                for (var i = 0; i < cards.length; i++) {
+                  cards[i].addEventListener('click', function () {
+                    var id = parseInt(this.getAttribute('data-id'), 10);
+                    applySelected(id);
+                    fetch('/remote/select?id=' + id, { method: 'POST' }).catch(function () {});
+                  });
+                }
+                poll();
+                setInterval(poll, 1500);
+              })();
+              </script>
+            </body>
+            </html>
+        """.trimIndent()
+        return newFixedLengthResponse(Response.Status.OK, "text/html", html)
+    }
+
+    private fun remoteStateJson(): Response {
+        val state = remoteSelection.get()
+        val json = "{\"videoId\":${state.videoId ?: "null"},\"revision\":${state.revision}}"
+        val response = newFixedLengthResponse(Response.Status.OK, "application/json", json)
+        response.addHeader("Cache-Control", "no-store")
+        return response
+    }
+
+    private fun handleRemoteSelect(session: IHTTPSession): Response {
+        val id = session.parameters["id"]?.firstOrNull()?.toIntOrNull()
+            ?: return newFixedLengthResponse(Response.Status.BAD_REQUEST, "text/plain", "Missing or invalid id")
+        if (entries.none { it.id == id }) {
+            return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Video not found")
+        }
+        remoteSelection.updateAndGet { RemoteSelection(id, it.revision + 1) }
+        return newFixedLengthResponse(Response.Status.OK, "text/plain", "OK")
     }
 
     private fun serveVideo(session: IHTTPSession): Response {

@@ -40,6 +40,11 @@
             android:configChanges="keyboardHidden" />
 
         <activity
+            android:name=".RemoteControlActivity"
+            android:exported="false"
+            android:configChanges="keyboardHidden" />
+
+        <activity
             android:name=".SettingsActivity"
             android:exported="false"
             android:configChanges="keyboardHidden" />

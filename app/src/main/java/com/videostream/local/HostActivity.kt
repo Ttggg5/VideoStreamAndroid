@@ -84,6 +84,9 @@ class HostActivity : BaseActivity() {
                 ensureNotificationPermissionThenStart()
             }
         }
+        binding.remoteControlButton.setOnClickListener {
+            startActivity(Intent(this, RemoteControlActivity::class.java))
+        }
 
         // Picking a file/folder is stored in plain fields, not view state, so it survives
         // a rotation (or any other config-change recreation, e.g. entering landscape) on its
@@ -209,6 +212,9 @@ class HostActivity : BaseActivity() {
             binding.toggleButton.isEnabled = streaming || selectedUri != null
             binding.chooseFileButton.isEnabled = !streaming
             binding.chooseFolderButton.isEnabled = !streaming
+            // Only folder mode has more than one video for a remote to choose between.
+            binding.remoteControlButton.visibility =
+                if (streaming && selectedIsFolder) View.VISIBLE else View.GONE
             if (!streaming) {
                 binding.statusText.text = getString(R.string.status_idle)
             }

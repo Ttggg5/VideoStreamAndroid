@@ -59,6 +59,22 @@ with a built-in screen to open another device's stream.
   native view (hiding the status/nav bars) the same way a full browser
   would; without one, a plain `WebView` silently can't enter fullscreen
   at all.
+- **Remote control mode**: normally each viewer browses and picks for
+  themselves, but for a folder stream there's a second way to pick a
+  video — `/remote` (opened via a **Remote Control** button on the Host
+  screen once a folder is streaming, or by loading `/remote` from any
+  other browser on the LAN) lets one device choose on everyone else's
+  behalf, like a TV remote. Tapping a video there calls `/remote/select`,
+  and every open `/browse`/`/watch` page polls `/remote/state` every 1.5
+  seconds and follows along automatically — jumping straight to that
+  video, in place if it's already in the current playlist, or by loading
+  the watch page otherwise. It's entirely additive: nothing changes for
+  anyone if `/remote` is never opened, and a viewer who'd rather keep
+  picking their own videos can just keep browsing normally (their page
+  will still jump if a remote selection comes in, the same as any other
+  viewer). `RemoteControlActivity` is a thin `WebView` wrapper the host
+  app uses to open its own `/remote` page without leaving the app; the
+  page itself works the same from any browser.
 - **Stay alive**: the server runs inside a foreground `Service`, so
   streaming keeps going even if you switch away from the app (the
   notification shows the URL and has a Stop action).
@@ -145,6 +161,10 @@ VLC can also open the `http://<ip>:<port>/video` URL directly.
      Next), plays through the rest of the playlist in random order (no
      repeats until everything's played) instead of in sequence.
 
+   For a folder stream, a **Remote Control** button also appears on the
+   Host screen — tap it to pick what plays on every connected viewer
+   yourself, instead of leaving it to each of them.
+
 ### Watching from this app
 
 1. Tap **Watch a Stream**. The screen searches the local network for
@@ -163,8 +183,9 @@ VLC can also open the `http://<ip>:<port>/video` URL directly.
 ```
 app/src/main/java/com/videostream/local/
   MainActivity.kt        Landing screen: choose Host, Watch, or Settings
-  HostActivity.kt         Host UI: file/folder picker, start/stop, notification permission
+  HostActivity.kt         Host UI: file/folder picker, start/stop, notification permission, Remote Control launch
   WatchActivity.kt        Viewer UI: NSD host discovery + address input + embedded WebView browser
+  RemoteControlActivity.kt   Thin WebView wrapper around this device's own /remote page
   SettingsActivity.kt      Accent color / theme / streaming port / keep-screen-on
   BaseActivity.kt          Applies the saved accent color to every screen, recreating it if changed
   AppSettings.kt           SharedPreferences-backed store for all Settings values
@@ -263,7 +284,9 @@ plug in `r0adkll/upload-google-play` (or similar) once those secrets exist.
 
 - One video (or one folder) at a time — starting a new stream replaces
   the previous one.
-- No authentication — anyone on the same LAN can open the stream URL.
+- No authentication — anyone on the same LAN can open the stream URL,
+  including `/remote`: any device that can reach it can change what
+  plays on every other connected viewer.
 - Folder scanning is capped at 500 videos and 6 levels deep, to keep
   startup fast on very large folders.
 - Some cloud-backed "virtual" documents (e.g. certain Google Drive/Photos

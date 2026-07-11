@@ -149,4 +149,78 @@ class MediaHttpServerTest {
         assertEquals(500, code)
         assertTrue(body.contains("Cannot open video file"))
     }
+
+    private fun post(server: MediaHttpServer, path: String): Pair<Int, String> {
+        val connection = URL("http://127.0.0.1:${server.listeningPort}$path").openConnection() as HttpURLConnection
+        connection.requestMethod = "POST"
+        val code = connection.responseCode
+        val stream = if (code in 200..299) connection.inputStream else connection.errorStream
+        val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
+        connection.disconnect()
+        return code to body
+    }
+
+    @Test
+    fun `remote state starts out unselected`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true)
+
+        val (code, body) = get(httpServer, "/remote/state")
+
+        assertEquals(200, code)
+        assertTrue(body.contains("\"videoId\":null"))
+    }
+
+    @Test
+    fun `selecting a video via remote updates the polled state`() {
+        val entries = listOf(
+            VideoEntry(id = 1, name = "one.mp4", folderPath = "", uri = fakeUri()),
+            VideoEntry(id = 2, name = "two.mp4", folderPath = "", uri = fakeUri())
+        )
+        val httpServer = startServer(entries, isFolderMode = true)
+
+        val (selectCode, _) = post(httpServer, "/remote/select?id=2")
+        assertEquals(200, selectCode)
+
+        val (code, body) = get(httpServer, "/remote/state")
+        assertEquals(200, code)
+        assertTrue(body.contains("\"videoId\":2"))
+    }
+
+    @Test
+    fun `selecting an unknown video via remote returns 404 and leaves state untouched`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true)
+
+        val (selectCode, _) = post(httpServer, "/remote/select?id=999")
+        assertEquals(404, selectCode)
+
+        val (_, body) = get(httpServer, "/remote/state")
+        assertTrue(body.contains("\"videoId\":null"))
+    }
+
+    @Test
+    fun `remote page lists videos as selectable cards rather than player links`() {
+        val entries = listOf(
+            VideoEntry(id = 1, name = "<b>weird</b>.mp4", folderPath = "", uri = fakeUri())
+        )
+        val httpServer = startServer(entries, isFolderMode = true)
+
+        val (code, body) = get(httpServer, "/remote")
+
+        assertEquals(200, code)
+        assertTrue(body.contains("data-id=\"1\""))
+        assertFalse("remote cards shouldn't link straight into the player", body.contains("/watch?id=1"))
+        assertFalse("raw markup must not appear unescaped", body.contains("<b>weird</b>.mp4"))
+    }
+
+    @Test
+    fun `remote is unavailable in single file mode`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = false)
+
+        val (code, _) = get(httpServer, "/remote")
+
+        assertEquals(404, code)
+    }
 }

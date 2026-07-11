@@ -24,6 +24,8 @@
 
     <string name="start_streaming">Start Streaming</string>
     <string name="stop_streaming">Stop Streaming</string>
+    <string name="remote_control">Remote Control</string>
+    <string name="remote_control_hint">Pick what plays on every connected viewer, like a TV remote</string>
 
     <string name="status_idle">Not streaming</string>
     <string name="status_starting">Starting...</string>

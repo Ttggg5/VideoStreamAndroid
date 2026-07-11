@@ -119,6 +119,8 @@ class MediaHttpServer(
         "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z\"/></svg>"
     private val chevronLeftIconSvg =
         "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M15 6l-6 6 6 6\"/></svg>"
+    private val chevronRightIconSvg =
+        "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M9 6l6 6-6 6\"/></svg>"
     private val playBadgeIconSvg =
         "<svg width=\"36\" height=\"36\" viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"10\" fill=\"rgba(0,0,0,0.55)\"/><path d=\"M10 8l6 4-6 4z\" fill=\"#fff\"/></svg>"
     private val speakerMutedIconSvg =
@@ -1152,25 +1154,34 @@ class MediaHttpServer(
         } else {
             ""
         }
+        // Prev/Next (and Random) step through whatever's currently listed below in this same
+        // folder/sort order — the same set the grid itself shows, so the buttons always match
+        // what's visually on screen.
+        val videoIdsJson = videos.joinToString(",") { it.id.toString() }
         val playerSection = if (currentEntry != null) {
             """
-            <div class="nowPlayingCard">
-              <img class="nowPlayingThumb" src="/thumbnail?id=${currentEntry.id}" alt="">
-              <div class="nowPlayingInfo">
-                <p class="nowPlayingLabel">Now playing on every connected viewer</p>
-                <p class="nowPlayingTitle">${escapeHtml(currentEntry.name)}</p>
+            <div class="controlPanel">
+              <div class="nowPlayingCard">
+                <img class="nowPlayingThumb" src="/thumbnail?id=${currentEntry.id}" alt="">
+                <div class="nowPlayingInfo">
+                  <p class="nowPlayingLabel">Now playing on every connected viewer</p>
+                  <p class="nowPlayingTitle">${escapeHtml(currentEntry.name)}</p>
+                </div>
+                <label class="toggle"><input type="checkbox" id="shuffleToggle"> Random</label>
+                <button type="button" id="exitRemoteButton" class="exitButton">Exit remote mode</button>
               </div>
-              <button type="button" id="exitRemoteButton" class="exitButton">Exit remote mode</button>
+              <div class="transportControls">
+                <button type="button" id="prevButton" class="ctrlButton navButton" aria-label="Previous video">$chevronLeftIconSvg</button>
+                <button type="button" id="playPauseButton" class="ctrlButton" aria-label="Play or pause">&#9654;</button>
+                <button type="button" id="nextButton" class="ctrlButton navButton" aria-label="Next video">$chevronRightIconSvg</button>
+                <span id="currentTimeLabel" class="timeLabel">0:00</span>
+                <input type="range" id="seekBar" class="seekBar" min="0" max="0" value="0" step="0.1">
+                <span id="durationLabel" class="timeLabel">0:00</span>
+              </div>
+              <video id="player" class="hiddenVideo" muted autoplay playsinline preload="auto">
+                <source src="/video?id=${currentEntry.id}" type="${guessVideoMimeType(currentEntry.name)}">
+              </video>
             </div>
-            <div class="transportControls">
-              <button type="button" id="playPauseButton" class="ctrlButton" aria-label="Play or pause">&#9654;</button>
-              <span id="currentTimeLabel" class="timeLabel">0:00</span>
-              <input type="range" id="seekBar" class="seekBar" min="0" max="0" value="0" step="0.1">
-              <span id="durationLabel" class="timeLabel">0:00</span>
-            </div>
-            <video id="player" class="hiddenVideo" muted autoplay playsinline preload="auto">
-              <source src="/video?id=${currentEntry.id}" type="${guessVideoMimeType(currentEntry.name)}">
-            </video>
             """.trimIndent()
         } else {
             """<p class="placeholder">Pick a video below to start controlling playback on every connected viewer.</p>"""
@@ -1190,14 +1201,27 @@ class MediaHttpServer(
                   margin: 0; padding: 24px; background: #111319; color: #eee;
                   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
                 }
+                /* Set on <body> only while a video is selected (see the controlPanel below) — the
+                   panel is fixed/floating, so without this the bottom of the folder/video grid
+                   would sit hidden underneath it. */
+                body.hasControlPanel { padding-bottom: 210px; }
                 h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -0.01em; }
                 .subtitle { margin: 0 0 16px; color: #888; font-size: 13px; }
+                /* Floats over the bottom of the page instead of sitting inline at the top, so
+                   the transport controls stay reachable without scrolling back up while
+                   browsing for the next video to pick. */
+                .controlPanel {
+                  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+                  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+                  background: #181b24; border-top: 1px solid #262a36;
+                  box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.4);
+                }
                 .nowPlayingCard {
-                  display: flex; align-items: center; gap: 12px; padding: 10px; margin-bottom: 8px;
+                  display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 10px; margin-bottom: 8px;
                   background: #1c1f28; border-radius: 12px;
                 }
                 .nowPlayingThumb { width: 64px; aspect-ratio: 16 / 9; object-fit: cover; background: #000; border-radius: 8px; flex-shrink: 0; }
-                .nowPlayingInfo { flex: 1; min-width: 0; }
+                .nowPlayingInfo { flex: 1; min-width: 120px; }
                 .nowPlayingLabel { margin: 0 0 2px; font-size: 11px; color: #888; }
                 .nowPlayingTitle { margin: 0; font-size: 14px; word-break: break-word; }
                 .exitButton {
@@ -1205,6 +1229,12 @@ class MediaHttpServer(
                   background: #262a36; color: #eee; font-size: 12px; font: inherit;
                 }
                 .exitButton:hover { background: #333846; }
+                .toggle {
+                  display: flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px;
+                  background: #262a36; font-size: 12px; color: #ccc; white-space: nowrap; cursor: pointer;
+                  flex-shrink: 0;
+                }
+                .toggle:has(input:checked) { background: var(--accent); color: #fff; }
                 /* This is a control panel, not a viewing screen — the video itself stays loaded
                    (so the seek bar/duration are real) but is never shown or heard; a plain
                    button + range-input scrub bar drive it instead of an embedded video player's
@@ -1217,7 +1247,7 @@ class MediaHttpServer(
                   opacity: 0; pointer-events: none;
                 }
                 .transportControls {
-                  display: flex; align-items: center; gap: 10px; padding: 10px 14px; margin-bottom: 8px;
+                  display: flex; align-items: center; gap: 10px; padding: 10px 14px;
                   background: #1c1f28; border-radius: 12px;
                 }
                 .ctrlButton {
@@ -1226,6 +1256,10 @@ class MediaHttpServer(
                   display: flex; align-items: center; justify-content: center;
                 }
                 .ctrlButton:hover { opacity: 0.85; }
+                .ctrlButton.navButton { background: #262a36; width: 36px; height: 36px; }
+                .ctrlButton.navButton:hover { background: #333846; }
+                .ctrlButton:disabled { opacity: 0.35; cursor: default; }
+                .ctrlButton:disabled:hover { background: #262a36; }
                 .timeLabel { flex-shrink: 0; width: 36px; font-size: 12px; color: #ccc; text-align: center; }
                 .seekBar { flex: 1; accent-color: var(--accent); cursor: pointer; }
                 .placeholder { margin: 0 0 20px; padding: 32px; text-align: center; color: #888; background: #1c1f28; border-radius: 12px; }
@@ -1266,7 +1300,7 @@ class MediaHttpServer(
                 .videoCard .title { display: block; padding: 8px; font-size: 13px; word-break: break-word; }
               </style>
             </head>
-            <body>
+            <body${if (currentEntry != null) " class=\"hasControlPanel\"" else ""}>
               <h1>${escapeHtml(title)}</h1>
               <p class="subtitle">Every connected viewer sees exactly what plays here — pick a video, then use the player controls to drive playback for everyone.</p>
               $playerSection
@@ -1287,6 +1321,40 @@ class MediaHttpServer(
                 // one's just being reloaded/reopened mid-video), start the scrub bar at the
                 // same spot instead of 0.
                 var initialPositionSeconds = ${currentPositionSeconds(current)};
+                // Backs the Prev/Next buttons — the same videos listed below, in the same sort
+                // order, so the buttons always match what's visually on screen.
+                var videoIds = [$videoIdsJson];
+
+                function loadPref(key, defaultValue) {
+                  var v = localStorage.getItem(key);
+                  return v === null ? defaultValue : v === '1';
+                }
+                function savePref(key, value) {
+                  localStorage.setItem(key, value ? '1' : '0');
+                }
+                var shuffleMode = loadPref('remoteShuffleMode', false);
+
+                // Every /remote/select reloads this whole page (see below), so there's no
+                // in-page state to keep a shuffle "bag" in between picks — a fresh uniformly
+                // random pick each time is simpler and just as good a fit for "random play".
+                function nextVideoId() {
+                  if (shuffleMode) {
+                    var candidates = videoIds.filter(function (id) { return id !== initialVideoId; });
+                    if (candidates.length === 0) return null;
+                    return candidates[Math.floor(Math.random() * candidates.length)];
+                  }
+                  var idx = videoIds.indexOf(initialVideoId);
+                  return (idx >= 0 && idx + 1 < videoIds.length) ? videoIds[idx + 1] : null;
+                }
+                function prevVideoId() {
+                  var idx = videoIds.indexOf(initialVideoId);
+                  return idx > 0 ? videoIds[idx - 1] : null;
+                }
+                function selectVideo(id) {
+                  fetch('/remote/select?id=' + id, { method: 'POST' }).then(function () {
+                    location.reload();
+                  }).catch(function () {});
+                }
                 // Muted: this device is a remote, not a viewer — the video decodes only to
                 // drive a real seek bar/duration, never to be watched or listened to itself.
                 // No player library here — a plain <video> plus a button and a range-input
@@ -1362,12 +1430,38 @@ class MediaHttpServer(
                 var cards = document.querySelectorAll('.videoCard');
                 for (var i = 0; i < cards.length; i++) {
                   cards[i].addEventListener('click', function () {
-                    var id = parseInt(this.getAttribute('data-id'), 10);
-                    fetch('/remote/select?id=' + id, { method: 'POST' }).then(function () {
-                      location.reload();
-                    }).catch(function () {});
+                    selectVideo(parseInt(this.getAttribute('data-id'), 10));
                   });
                 }
+
+                var prevButton = document.getElementById('prevButton');
+                var nextButton = document.getElementById('nextButton');
+                var shuffleToggle = document.getElementById('shuffleToggle');
+                function updateNavButtonsState() {
+                  if (prevButton) prevButton.disabled = prevVideoId() === null;
+                  if (nextButton) nextButton.disabled = nextVideoId() === null;
+                }
+                if (prevButton) {
+                  prevButton.addEventListener('click', function () {
+                    var id = prevVideoId();
+                    if (id !== null) selectVideo(id);
+                  });
+                }
+                if (nextButton) {
+                  nextButton.addEventListener('click', function () {
+                    var id = nextVideoId();
+                    if (id !== null) selectVideo(id);
+                  });
+                }
+                if (shuffleToggle) {
+                  shuffleToggle.checked = shuffleMode;
+                  shuffleToggle.addEventListener('change', function () {
+                    shuffleMode = shuffleToggle.checked;
+                    savePref('remoteShuffleMode', shuffleMode);
+                    updateNavButtonsState();
+                  });
+                }
+                updateNavButtonsState();
 
                 var exitButton = document.getElementById('exitRemoteButton');
                 if (exitButton) {

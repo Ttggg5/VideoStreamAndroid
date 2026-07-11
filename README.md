@@ -61,13 +61,19 @@ with a built-in screen to open another device's stream.
   screen once a folder is streaming, or by loading `/remote` from any
   other browser on the LAN) lets one device drive playback for everyone
   else, like an actual TV remote. `/remote` is a **control panel, not a
-  viewing screen**: it shows a "Now playing" card (thumbnail + title) and
-  transport controls (a plain play/pause button plus a range-input scrub
-  bar — no embedded video player UI of its own) for whatever's currently
-  picked, but never the video picture itself, and stays muted — the video
-  decodes in the background just enough to drive a real seek bar/duration,
-  since this device is controlling the stream, not watching it. The folder
-  browser sits below that; tapping a video calls `/remote/select`, and
+  viewing screen**: a "Now playing" card (thumbnail + title) and transport
+  controls (Previous/Next, a plain play/pause button, a range-input scrub
+  bar, and a **Random** toggle — no embedded video player UI of its own)
+  float in a fixed panel docked to the bottom of the page, staying
+  reachable while the folder browser above it is scrolled to pick
+  something else. The controls drive whatever's currently picked but never
+  show the video picture itself, and stay muted — the video decodes in the
+  background just enough to drive a real seek bar/duration, since this
+  device is controlling the stream, not watching it. Previous/Next step
+  through whichever folder's videos are currently listed on screen, in the
+  active sort order; with Random turned on, Next instead jumps to a
+  uniformly random video from that same list. The folder browser sits
+  below the floating panel; tapping a video calls `/remote/select`, and
   using the transport controls calls `/remote/command`. Every other open
   `/browse`/`/watch` page keeps a WebSocket open to `/remote/ws`, which
   pushes the current state the instant it connects and again on every

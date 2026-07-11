@@ -248,6 +248,50 @@ class MediaHttpServerTest {
     }
 
     @Test
+    fun `remote control panel floats at the bottom only once a video is selected`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true)
+
+        val (_, beforeBody) = get(httpServer, "/remote")
+        assertFalse("no floating panel before anything's picked", beforeBody.contains("class=\"controlPanel\""))
+        assertFalse("no reserved bottom padding before anything's picked", beforeBody.contains("hasControlPanel"))
+
+        post(httpServer, "/remote/select?id=1")
+        val (_, afterBody) = get(httpServer, "/remote")
+        assertTrue("control panel should float once a video is selected", afterBody.contains("class=\"controlPanel\""))
+        assertTrue("body should reserve space for the floating panel", afterBody.contains("hasControlPanel"))
+    }
+
+    @Test
+    fun `remote control panel offers previous, next, and a random toggle`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true)
+        post(httpServer, "/remote/select?id=1")
+
+        val (_, body) = get(httpServer, "/remote")
+
+        assertTrue(body.contains("id=\"prevButton\""))
+        assertTrue(body.contains("id=\"nextButton\""))
+        assertTrue(body.contains("id=\"shuffleToggle\""))
+    }
+
+    @Test
+    fun `next button on the remote control panel steps to the next video in the current listing`() {
+        val entries = listOf(
+            VideoEntry(id = 1, name = "a.mp4", folderPath = "", uri = fakeUri()),
+            VideoEntry(id = 2, name = "b.mp4", folderPath = "", uri = fakeUri()),
+            VideoEntry(id = 3, name = "c.mp4", folderPath = "", uri = fakeUri())
+        )
+        val httpServer = startServer(entries, isFolderMode = true)
+        post(httpServer, "/remote/select?id=2")
+
+        val (_, body) = get(httpServer, "/remote")
+
+        // Sorted by name (the default), which for a/b/c matches id order 1,2,3.
+        assertTrue("videoIds should list every video in this folder for Prev/Next to step through", body.contains("var videoIds = [1,2,3];"))
+    }
+
+    @Test
     fun `remote command requires a video to already be selected`() {
         val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
         val httpServer = startServer(entries, isFolderMode = true)

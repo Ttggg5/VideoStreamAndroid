@@ -121,6 +121,8 @@ class MediaHttpServer(
         "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M15 6l-6 6 6 6\"/></svg>"
     private val playBadgeIconSvg =
         "<svg width=\"36\" height=\"36\" viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"10\" fill=\"rgba(0,0,0,0.55)\"/><path d=\"M10 8l6 4-6 4z\" fill=\"#fff\"/></svg>"
+    private val speakerMutedIconSvg =
+        "<svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M11 5 6 9H3v6h3l5 4V5z\"/><line x1=\"23\" y1=\"9\" x2=\"17\" y2=\"15\"/><line x1=\"17\" y1=\"9\" x2=\"23\" y2=\"15\"/></svg>"
 
     /** Closes the underlying [ParcelFileDescriptor] together with the stream view over it. */
     private class ClosingFileInputStream(private val pfd: ParcelFileDescriptor) :
@@ -985,12 +987,22 @@ class MediaHttpServer(
                 .video-js .vjs-error-display {
                   display: none !important;
                 }
+                /* Shown only when the browser refused to autoplay with sound (its usual
+                   policy for a page that hasn't seen a direct user gesture) — this player
+                   falls back to muted playback so the poster thumbnail doesn't stay stuck on
+                   screen forever, and offers one tap to restore sound. */
+                .unmuteButton {
+                  display: none; position: fixed; right: 16px; bottom: 16px; z-index: 10;
+                  align-items: center; gap: 6px; padding: 10px 14px; border: none; border-radius: 999px;
+                  background: rgba(0, 0, 0, 0.65); color: #fff; font-size: 13px; cursor: pointer;
+                }
               </style>
             </head>
             <body>
               <video id="player" class="video-js" preload="auto" poster="/thumbnail?id=${entry.id}">
                 <source src="/video?id=${entry.id}" type="${guessVideoMimeType(entry.name)}">
               </video>
+              <button type="button" id="unmuteButton" class="unmuteButton">$speakerMutedIconSvg Tap for sound</button>
               <script src="/assets/videojs/video.min.js"></script>
               <script>
               (function () {
@@ -999,14 +1011,38 @@ class MediaHttpServer(
                 var lastPlayRevision = ${baseline.playRevision};
                 var lastSeekRevision = ${baseline.seekRevision};
                 var player = videojs('player', { autoplay: true, controls: false });
+                var unmuteButton = document.getElementById('unmuteButton');
+
+                // Browsers routinely refuse to autoplay a video WITH sound unless this page
+                // was reached via a direct user gesture — which a remote pick pushed over
+                // /remote/ws never is. Rather than leave the poster thumbnail stuck on screen
+                // forever (play() silently rejecting), fall back to muted playback so the
+                // picture always actually starts, and offer a one-tap way to restore sound.
+                function attemptPlay() {
+                  var playPromise = player.play();
+                  if (playPromise && typeof playPromise.catch === 'function') {
+                    playPromise.catch(function () {
+                      if (!player.muted()) {
+                        player.muted(true);
+                        if (unmuteButton) unmuteButton.style.display = 'flex';
+                        player.play().catch(function () {});
+                      }
+                    });
+                  }
+                }
+                if (unmuteButton) {
+                  unmuteButton.addEventListener('click', function () {
+                    player.muted(false);
+                    unmuteButton.style.display = 'none';
+                  });
+                }
+
                 // If playback was already underway elsewhere before this viewer connected,
-                // start at the same spot instead of position 0 — and don't just rely on the
-                // autoplay attribute (silently failing leaves the poster thumbnail stuck on
-                // screen forever): explicitly seek and play once the player's ready.
+                // start at the same spot instead of position 0.
                 player.ready(function () {
                   var startAt = ${currentPositionSeconds(baseline)};
                   if (startAt > 0) player.currentTime(startAt);
-                  player.play().catch(function () {});
+                  attemptPlay();
                 });
 
                 function applyState(state) {
@@ -1023,12 +1059,12 @@ class MediaHttpServer(
                     player.poster('/thumbnail?id=' + state.videoId);
                     player.src({ src: '/video?id=' + state.videoId, type: videoTypes[state.videoId] || 'video/mp4' });
                     if (state.positionSeconds > 0) player.currentTime(state.positionSeconds);
-                    player.play().catch(function () {});
+                    attemptPlay();
                     return;
                   }
                   if (state.playRevision !== lastPlayRevision) {
                     lastPlayRevision = state.playRevision;
-                    if (state.playing) player.play().catch(function () {}); else player.pause();
+                    if (state.playing) attemptPlay(); else player.pause();
                   }
                   if (state.seekRevision !== lastSeekRevision) {
                     lastSeekRevision = state.seekRevision;

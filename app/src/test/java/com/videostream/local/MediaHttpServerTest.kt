@@ -360,6 +360,17 @@ class MediaHttpServerTest {
     }
 
     @Test
+    fun `bare player offers a muted-fallback unmute button for when autoplay-with-sound is blocked`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true)
+
+        val (_, body) = get(httpServer, "/watch?id=1&remote=1")
+
+        assertTrue("needs a fallback control to recover sound after a forced mute", body.contains("id=\"unmuteButton\""))
+        assertTrue("should attempt playback through a helper that can retry muted", body.contains("attemptPlay"))
+    }
+
+    @Test
     fun `a normal watch page still has its own controls when not following a remote`() {
         val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
         val httpServer = startServer(entries, isFolderMode = true)

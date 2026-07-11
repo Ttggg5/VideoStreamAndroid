@@ -143,6 +143,13 @@ class MediaHttpServer(
             "/remote/select" -> handleRemoteSelect(session)
             "/remote/command" -> handleRemoteCommand(session)
             "/remote/clear" -> handleRemoteClear()
+            "/api/info" -> apiInfoJson()
+            "/api/browse" -> apiBrowseJson(
+                session.parameters["path"]?.firstOrNull().orEmpty(),
+                SortMode.fromParam(session.parameters["sort"]?.firstOrNull() ?: defaultSortParam),
+                session.parameters["flat"]?.firstOrNull() == "1"
+            )
+            "/api/video" -> apiVideoJson(session)
             else -> newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Not found")
         }
     }
@@ -238,6 +245,69 @@ class MediaHttpServer(
         "wmv" -> "video/x-ms-wmv"
         "mpg", "mpeg" -> "video/mpeg"
         else -> "video/mp4"
+    }
+
+    /**
+     * Tells a native client (the app's own [WatchActivity], or any other JSON-speaking client)
+     * what it's connecting to, before it decides whether to show a folder browser or go
+     * straight to a single video.
+     */
+    private fun apiInfoJson(): Response {
+        val json = "{" +
+            "\"libraryName\":${jsonString(libraryName)}," +
+            "\"isFolderMode\":$isFolderMode," +
+            "\"defaultSort\":${jsonString(defaultSortParam)}" +
+            "}"
+        return newFixedLengthResponse(Response.Status.OK, "application/json", json)
+    }
+
+    /**
+     * The JSON equivalent of [browsePage] — what a native client needs to render the same
+     * folder/video listing itself, instead of parsing server-rendered HTML. Same [computeListing]
+     * backing, same 404-if-nothing-here behavior.
+     */
+    private fun apiBrowseJson(path: String, sortMode: SortMode, flat: Boolean): Response {
+        val listing = computeListing(path, flat, sortMode)
+            ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "application/json", "{\"error\":\"Folder not found\"}")
+        val videosJson = listing.videos.joinToString(",") { entry ->
+            "{" +
+                "\"id\":${entry.id}," +
+                "\"name\":${jsonString(entry.name)}," +
+                "\"folderPath\":${jsonString(entry.folderPath)}," +
+                "\"type\":${jsonString(guessVideoMimeType(entry.name))}," +
+                "\"sizeBytes\":${entry.sizeBytes}," +
+                "\"lastModified\":${entry.lastModified}" +
+                "}"
+        }
+        val subfoldersJson = listing.subfolders.joinToString(",") { jsonString(it) }
+        val json = "{" +
+            "\"effectivePath\":${jsonString(listing.effectivePath)}," +
+            "\"title\":${jsonString(listing.title)}," +
+            "\"videos\":[$videosJson]," +
+            "\"subfolders\":[$subfoldersJson]" +
+            "}"
+        val response = newFixedLengthResponse(Response.Status.OK, "application/json", json)
+        response.addHeader("Cache-Control", "no-store")
+        return response
+    }
+
+    /**
+     * Metadata for a single video by id, regardless of what folder it's in — what a native
+     * client needs to show a title/type for a video it hasn't browsed to itself, e.g. one
+     * picked by someone else on `/remote` that it's now following.
+     */
+    private fun apiVideoJson(session: IHTTPSession): Response {
+        val entry = entryFor(session)
+            ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "application/json", "{\"error\":\"Video not found\"}")
+        val json = "{" +
+            "\"id\":${entry.id}," +
+            "\"name\":${jsonString(entry.name)}," +
+            "\"folderPath\":${jsonString(entry.folderPath)}," +
+            "\"type\":${jsonString(guessVideoMimeType(entry.name))}," +
+            "\"sizeBytes\":${entry.sizeBytes}," +
+            "\"lastModified\":${entry.lastModified}" +
+            "}"
+        return newFixedLengthResponse(Response.Status.OK, "application/json", json)
     }
 
     /**

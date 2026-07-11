@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Columns in the native video grid on the Watch screen. Wider on tablets (see
+         values-sw600dp/integers.xml), matching the pattern used for screen_horizontal_margin. -->
+    <integer name="video_grid_span_count">2</integer>
+</resources>

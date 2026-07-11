@@ -48,6 +48,14 @@
     <string name="watch_discovery_refresh">Search again</string>
     <string name="watch_discovery_empty">No hosts found yet — you can also enter the address manually below.</string>
 
+    <string name="watch_back">Back</string>
+    <string name="watch_view_all_videos">All videos</string>
+    <string name="watch_autoplay">Autoplay</string>
+    <string name="watch_shuffle">Shuffle</string>
+    <string name="watch_browse_failed">Couldn\'t load the video list. Check the connection and try again.</string>
+    <string name="watch_browse_empty">No videos found here.</string>
+    <string name="watch_playback_error">Couldn\'t play this video.</string>
+
     <string name="settings">Settings</string>
     <string name="settings_accent_color">Accent color</string>
     <string name="accent_color_description">%1$s accent color</string>

@@ -74,6 +74,14 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.4")
     implementation("androidx.activity:activity-ktx:1.9.1")
     implementation("androidx.documentfile:documentfile:1.0.1")
+    // Native folder/video browsing grid on the Watch screen (replaces the WebView's HTML page).
+    implementation("androidx.recyclerview:recyclerview:1.3.2")
+    // Native video playback for WatchActivity's player screen: broader, more consistent
+    // container/codec support across OEMs/Android versions than the built-in MediaPlayer/
+    // VideoView, plus built-in playlist support (autoplay/shuffle/prev-next come from the
+    // player's own media-item queue instead of needing to be hand-rolled).
+    implementation("androidx.media3:media3-exoplayer:1.4.1")
+    implementation("androidx.media3:media3-ui:1.4.1")
 
     implementation("org.nanohttpd:nanohttpd:2.3.1")
 

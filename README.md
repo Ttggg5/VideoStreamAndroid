@@ -49,16 +49,12 @@ with a built-in screen to open another device's stream.
   floating over the video); clicking another entry, pressing Prev/Next,
   letting the current one finish (autoplay), or shuffle picking one at
   random all switch to it in place (swap the player's source and call
-  `.play()`) instead of reloading the page — this needs a bit of inline
-  JavaScript, which is why `WatchActivity`'s embedded browser runs with
-  JS enabled. Next follows shuffle order when Shuffle is on; Prev
-  retraces actual play order (including shuffle jumps) and is disabled
-  once there's nowhere earlier to go. video.js's fullscreen button works
-  in-app too — `WatchActivity` registers a `WebChromeClient` so its
-  embedded browser can hand fullscreen video off to a real full-screen
-  native view (hiding the status/nav bars) the same way a full browser
-  would; without one, a plain `WebView` silently can't enter fullscreen
-  at all.
+  `.play()`) instead of reloading the page. Next follows shuffle order
+  when Shuffle is on; Prev retraces actual play order (including shuffle
+  jumps) and is disabled once there's nowhere earlier to go. This is all
+  for the plain web page any browser gets at `/browse`/`/watch` — the
+  app's own **Watch a Stream** screen doesn't use this page at all; see
+  below.
 - **Remote control mode**: normally each viewer browses and picks for
   themselves, but for a folder stream there's a second way to pick a
   video — `/remote` (opened via a **Remote Control** button on the Host
@@ -88,16 +84,31 @@ with a built-in screen to open another device's stream.
 - **Stay alive**: the server runs inside a foreground `Service`, so
   streaming keeps going even if you switch away from the app (the
   notification shows the URL and has a Stop action).
-- **Watch**: the app also has a built-in **Watch a Stream** screen. It
+- **Watch, natively**: the app's own **Watch a Stream** screen is not a
+  browser — it's native views talking to the host's JSON API
+  (`/api/info`, `/api/browse`, `/api/video`, alongside the existing
+  `/video`/`/thumbnail`/`/remote/state` routes) and playing video with
+  [ExoPlayer](https://developer.android.com/media/media3/exoplayer)
+  (`androidx.media3`) instead of an embedded video.js page. It
   automatically finds hosts on the same local network via NSD/mDNS
   service discovery (`android.net.nsd`) — every host advertises itself
   under `_videostream._tcp.` as soon as it starts streaming — and lists
   them for a tap to connect; typing in the hosting device's address and
   tapping **Connect** still works too, for networks where discovery
-  doesn't reach (see Known limitations). Either way it opens that
-  device's page in an embedded browser, so you don't need a separate
-  laptop/browser to view a stream; another copy of this app works as the
-  viewer too.
+  doesn't reach (see Known limitations). Once connected, a folder-mode
+  host gets a native folder/video grid (thumbnails loaded over HTTP into
+  a `RecyclerView`, with its own Sort spinner and Folders/All-videos
+  switch); tapping a video opens a native player built on ExoPlayer's own
+  playlist support, which is what actually provides Autoplay, Shuffle,
+  and Prev/Next — those aren't hand-rolled here the way the web page has
+  to, they're just `pauseAtEndOfMediaItems`, `shuffleModeEnabled`, and
+  ExoPlayer's built-in previous/next media-item navigation. The screen
+  also polls `/remote/state` for as long as it's connected: the moment a
+  host ever makes a pick on `/remote`, this screen hides its own controls
+  and follows along — same play/pause/seek/video-switch behavior as the
+  bare web viewer — and hands normal controls back once the host leaves
+  remote mode. Another copy of this app works as the viewer too, of
+  course, the same as any other browser would.
 - **Rotates and adapts to bigger screens**: every screen in the app now
   supports landscape (previously locked to portrait) with a dedicated
   layout — the two Host/Watch options sit side by side instead of
@@ -184,9 +195,17 @@ VLC can also open the `http://<ip>:<port>/video` URL directly.
    connect directly — enter the address shown on the hosting device
    (just the IP, e.g. `192.168.1.23`, or the full URL) and tap
    **Connect**.
-3. The host's page loads in an embedded browser — browse the folder and
-   pick a video (folder mode) or it starts playing right away
-   (single-file mode).
+3. For a folder stream, a native grid of subfolders/videos with
+   thumbnails appears — tap a folder to browse into it, tap **‹** to go
+   back up a level, and use the **Sort** spinner or **All videos** switch
+   the same way you would on the web page. For a single-file stream,
+   playback just starts.
+4. Tapping a video opens the native player — **Autoplay** and
+   **Shuffle** switches sit in its top bar when there's more than one
+   video to play through, and Prev/Next live in the player's own control
+   bar. If the host ever uses **Remote Control**, this screen's controls
+   disappear and it just follows along with whatever the host is doing,
+   the same as any other connected viewer.
 
 ## Project layout
 
@@ -194,21 +213,26 @@ VLC can also open the `http://<ip>:<port>/video` URL directly.
 app/src/main/java/com/videostream/local/
   MainActivity.kt        Landing screen: choose Host, Watch, or Settings
   HostActivity.kt         Host UI: file/folder picker, start/stop, notification permission, Remote Control launch
-  WatchActivity.kt        Viewer UI: NSD host discovery + address input + embedded WebView browser
-  RemoteControlActivity.kt   Thin WebView wrapper around this device's own /remote page
+  WatchActivity.kt        Viewer UI: NSD host discovery, native folder/video browsing, ExoPlayer playback, /remote-follow
+  RemoteLibraryApi.kt      Blocking HTTP/JSON client for a host's /api/info, /api/browse, /api/video, /remote/state
+  BrowseAdapter.kt         RecyclerView adapter mixing folder rows and video grid cells for WatchActivity's browse screen
+  ThumbnailLoader.kt       Loads a host's /thumbnail?id=… images into ImageViews with a small in-memory cache
+  RemoteControlActivity.kt   Thin WebView wrapper around this device's own /remote page (host-side control panel)
   SettingsActivity.kt      Accent color / theme / streaming port / keep-screen-on
   BaseActivity.kt          Applies the saved accent color to every screen, recreating it if changed
   AppSettings.kt           SharedPreferences-backed store for all Settings values
   VideoStreamApplication.kt   Applies the saved light/dark mode on process start
   StreamingService.kt      Foreground service hosting the HTTP server; scans folders for videos
-  MediaHttpServer.kt      NanoHTTPD server; serves a folder-structured browsing UI and byte-range video streaming
-  ThumbnailUtil.kt         Extracts a downscaled JPEG preview frame from a video, used by both the server and HostActivity
+  MediaHttpServer.kt      NanoHTTPD server; serves the web browsing/player UI, a JSON API for native clients, and byte-range video streaming
+  ThumbnailUtil.kt         Extracts a downscaled JPEG preview frame from a local video file, used by the server and HostActivity
   VideoEntry.kt            One playable video (id, display name, folder path, content Uri, size/date for sorting)
   NetworkUtils.kt          Finds the device's local IPv4 address
 app/src/main/assets/videojs/
-  video.min.js, video-js.min.css   Bundled video.js player (Apache-2.0), served at /assets/videojs/...
+  video.min.js, video-js.min.css   Bundled video.js player (Apache-2.0), served at /assets/videojs/... for any browser (and RemoteControlActivity's /remote WebView) — not used by WatchActivity's native player
 app/src/main/res/layout-land/     Landscape layouts for MainActivity, HostActivity, WatchActivity
+app/src/main/res/layout/item_browse_folder.xml, item_browse_video.xml   Row/grid-cell layouts for WatchActivity's native browse screen
 app/src/main/res/values(-sw600dp)/dimens.xml   screen_horizontal_margin — wider on tablets
+app/src/main/res/values(-sw600dp)/integers.xml   video_grid_span_count — more columns on tablets
 app/src/test/java/com/videostream/local/
   MediaHttpServerTest.kt   Starts a real MediaHttpServer on a loopback port and hits it with HTTP requests
   NetworkUtilsTest.kt      Sanity-checks getLocalIpAddress()'s return shape
@@ -226,9 +250,11 @@ app/src/test/java/com/videostream/local/
   `AssetManager`, `Uri`) are mocked with Mockito rather than touched for
   real. Covers: HTML-escaping video/folder names (so a filename can't
   inject markup into the page), Sort ordering, folder-structure
-  navigation, single-file vs. folder mode, and that missing
-  files/videos come back as a clean 404/500 instead of crashing the
-  server.
+  navigation, single-file vs. folder mode, that missing files/videos come
+  back as a clean 404/500 instead of crashing the server, the `/remote`
+  select/command/clear flow, and the `/api/info`, `/api/browse`,
+  `/api/video` JSON endpoints `WatchActivity` (via `RemoteLibraryApi`)
+  actually consumes.
 - **`NetworkUtilsTest`** checks that `getLocalIpAddress()` never throws
   and that whatever it returns (if anything — this depends on the
   machine's actual network interfaces) looks like a real, non-loopback,
@@ -241,11 +267,19 @@ and meaningfully testing them would need Robolectric or instrumented
 
 ## Third-party
 
-The player on `/watch` pages is [video.js](https://videojs.com)
-(Apache License 2.0), bundled directly in the app under
-`app/src/main/assets/videojs/` — see `LICENSE` alongside it — rather than
-loaded from a CDN, so playback doesn't depend on the viewing device
-having internet access.
+The player on `/watch` pages (served to any browser, and to
+`RemoteControlActivity`'s embedded `/remote` view) is
+[video.js](https://videojs.com) (Apache License 2.0), bundled directly in
+the app under `app/src/main/assets/videojs/` — see `LICENSE` alongside it
+— rather than loaded from a CDN, so playback doesn't depend on the
+viewing device having internet access.
+
+`WatchActivity`'s own native player uses
+[ExoPlayer](https://developer.android.com/media/media3/exoplayer)
+(`androidx.media3`, Apache License 2.0) via standard Gradle dependencies
+rather than a bundled copy, for broader/more consistent video format
+support across devices than the platform's built-in `MediaPlayer` and
+built-in playlist/autoplay/shuffle support.
 
 ## CI/CD
 
@@ -306,15 +340,16 @@ plug in `r0adkll/upload-google-play` (or similar) once those secrets exist.
   an unsupported codec or a corrupt file just shows no thumbnail rather
   than blocking playback.
 - The in-app **Watch a Stream** screen has no encryption/authentication
-  either (it's a plain embedded browser over HTTP), matching the host's
+  either — it's plain HTTP/JSON calls to the host, matching the host's
   own local-network-only design.
 - Automatic host discovery relies on mDNS/NSD multicast traffic reaching
   both devices; some Wi-Fi hotspot implementations isolate clients from
   each other (AP/client isolation) and block it, so a discovered host
   may not always show up even when the manual address still works fine.
-- Rotating the device while **watching** a stream reconnects to the same
-  page (its `WebView` navigation history is restored), but doesn't
-  resume the exact video playback position — that's live JS/DOM state
-  inside the page, which a config-change recreation doesn't preserve.
-  Picking a file/folder on the **Host** screen and an in-progress stream
-  itself both survive rotation without resetting.
+- Rotating the device while **watching** a stream reconnects and
+  restores folder position/sort/flatten-view, but doesn't resume the
+  exact video playback position — that's live player state a
+  config-change recreation doesn't preserve, the same limitation the
+  previous WebView-based viewer had for the same reason. Picking a
+  file/folder on the **Host** screen and an in-progress stream itself
+  both survive rotation without resetting.

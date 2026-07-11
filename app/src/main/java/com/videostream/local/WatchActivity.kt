@@ -1,51 +1,102 @@
 package com.videostream.local
 
 import android.content.Context
-import android.graphics.Bitmap
-import android.net.Uri
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
+import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
-import android.webkit.WebChromeClient
-import android.webkit.WebResourceError
-import android.webkit.WebResourceRequest
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.recyclerview.widget.GridLayoutManager
 import com.videostream.local.databinding.ActivityWatchBinding
 
 /**
- * Lets this device act as a viewer, opening another device's hosted stream in an embedded
- * browser. Hosts on the same local network are found automatically via NSD/mDNS (the same
- * mechanism [StreamingService] advertises itself under) and listed for a tap-to-connect choice;
- * typing an address manually and tapping Connect always works too, in case discovery doesn't
- * reach a particular network (e.g. some Wi-Fi hotspot configurations isolate multicast traffic).
+ * Lets this device act as a viewer, browsing and playing another device's hosted stream with
+ * native views instead of an embedded browser. Hosts on the same local network are found
+ * automatically via NSD/mDNS (the same mechanism [StreamingService] advertises itself under)
+ * and listed for a tap-to-connect choice; typing an address manually and tapping Connect always
+ * works too. Once connected, folder browsing ([BrowseAdapter]) and playback ([ExoPlayer] via
+ * [androidx.media3.ui.PlayerView]) both talk to the host's JSON API (`/api/info`, `/api/browse`,
+ * `/api/video`) and its existing `/video`/`/thumbnail` routes — see [RemoteLibraryApi].
+ *
+ * `/remote` support (see [MediaHttpServer]'s doc) is mirrored natively too: this activity polls
+ * `/remote/state` the whole time it's connected, and the moment a host ever makes a pick there,
+ * takes over the player entirely — hiding its own controls and following play/pause/seek/
+ * video-switch commands — until the host leaves remote mode, at which point normal native
+ * controls come back for whatever's currently playing.
  */
 class WatchActivity : BaseActivity() {
 
     private lateinit var binding: ActivityWatchBinding
     private lateinit var nsdManager: NsdManager
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     /** Keyed by NSD service name so repeat discovery callbacks update rather than duplicate an entry. */
     private val discoveredHosts = LinkedHashMap<String, DiscoveredHost>()
     private var discoveryListener: NsdManager.DiscoveryListener? = null
     private var discoveryActive = false
-    private var connected = false
 
-    // Tracks the native view Chromium hands back while an in-page <video> (e.g. video.js's
-    // fullscreen button) is fullscreen, so the back button can exit it and onHideCustomView
-    // can clean up — a plain WebView without a WebChromeClient can't enter fullscreen at all.
-    private var fullscreenView: View? = null
-    private var fullscreenCallback: WebChromeClient.CustomViewCallback? = null
+    private enum class Screen { PRE_CONNECT, BROWSE, PLAYER }
+    private var screen = Screen.PRE_CONNECT
+
+    private var baseUrl: String? = null
+    private var libraryInfo: RemoteLibraryInfo? = null
+    private var currentPath = ""
+    private var currentSort = "name"
+    private var currentFlat = false
+    /** The videos [browseAdapter] is currently showing — the playlist scope for whichever one gets tapped. */
+    private var currentVideos: List<RemoteVideo> = emptyList()
+    private var browseAdapter: BrowseAdapter? = null
+
+    private var exoPlayer: ExoPlayer? = null
+    private val playerListener = object : Player.Listener {
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            binding.playerTitle.text = mediaItem?.mediaMetadata?.title ?: ""
+        }
+
+        override fun onPlayerError(error: PlaybackException) {
+            Toast.makeText(this@WatchActivity, R.string.watch_playback_error, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** True once a `/remote` pick has taken the player over — see class doc. */
+    private var followingRemote = false
+    private var remoteFollowVideoId: Int? = null
+    /** True while [enterRemoteFollow]'s metadata fetch is in flight, so a poll landing in that
+     *  window doesn't apply a play/pause/seek command to whatever the player still has loaded
+     *  from before the switch. */
+    private var remoteFollowLoading = false
+    private var lastPlayRevision = -1L
+    private var lastSeekRevision = -1L
+    private val remotePollRunnable = object : Runnable {
+        override fun run() {
+            val url = baseUrl
+            if (url != null) {
+                Thread {
+                    val state = RemoteLibraryApi.fetchRemoteState(url)
+                    runOnUiThread { if (baseUrl == url) applyRemoteState(state) }
+                }.start()
+            }
+            mainHandler.postDelayed(this, REMOTE_POLL_INTERVAL_MS)
+        }
+    }
 
     private data class DiscoveredHost(val name: String, val host: String, val port: Int)
 
@@ -57,64 +108,6 @@ class WatchActivity : BaseActivity() {
 
         if (AppSettings.getKeepScreenOnWhileWatching(this)) {
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        }
-
-        binding.webView.settings.apply {
-            // Required for the host's playlist / next-video-without-reload player script.
-            // Safe here: this WebView only ever loads pages this app's own server renders by
-            // default, and no JavascriptInterface bridge is exposed to give page script any
-            // access beyond the normal WebView sandbox.
-            @Suppress("SetJavaScriptEnabled")
-            javaScriptEnabled = true
-            mediaPlaybackRequiresUserGesture = false
-            domStorageEnabled = true
-        }
-        binding.webView.webViewClient = object : WebViewClient() {
-            override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
-                binding.loadingProgress.visibility = View.VISIBLE
-            }
-
-            override fun onPageFinished(view: WebView, url: String) {
-                binding.loadingProgress.visibility = View.GONE
-            }
-
-            override fun onReceivedError(
-                view: WebView,
-                request: WebResourceRequest,
-                error: WebResourceError
-            ) {
-                if (request.isForMainFrame) {
-                    binding.loadingProgress.visibility = View.GONE
-                    Toast.makeText(
-                        this@WatchActivity,
-                        getString(R.string.watch_connection_failed),
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-            }
-        }
-        binding.webView.webChromeClient = object : WebChromeClient() {
-            override fun onShowCustomView(view: View, callback: CustomViewCallback) {
-                if (fullscreenView != null) {
-                    callback.onCustomViewHidden()
-                    return
-                }
-                fullscreenView = view
-                fullscreenCallback = callback
-                binding.fullscreenContainer.addView(view)
-                binding.fullscreenContainer.visibility = View.VISIBLE
-                binding.webView.visibility = View.INVISIBLE
-                setImmersiveMode(true)
-            }
-
-            override fun onHideCustomView() {
-                binding.fullscreenContainer.removeAllViews()
-                binding.fullscreenContainer.visibility = View.GONE
-                binding.webView.visibility = View.VISIBLE
-                fullscreenView = null
-                fullscreenCallback = null
-                setImmersiveMode(false)
-            }
         }
 
         binding.connectButton.setOnClickListener { connect() }
@@ -131,45 +124,115 @@ class WatchActivity : BaseActivity() {
         }
         binding.discoveryRefreshButton.setOnClickListener { restartDiscovery() }
 
+        setUpBrowseSection()
+        setUpPlayerSection()
+
         onBackPressedDispatcher.addCallback(this) {
-            when {
-                fullscreenView != null -> fullscreenCallback?.onCustomViewHidden()
-                binding.webView.canGoBack() -> binding.webView.goBack()
-                else -> {
+            when (screen) {
+                Screen.PLAYER -> onPlayerBack()
+                Screen.BROWSE -> onBrowseBack()
+                Screen.PRE_CONNECT -> {
                     isEnabled = false
                     onBackPressedDispatcher.onBackPressed()
                 }
             }
         }
 
-        // Config-change recreation (e.g. rotating to landscape) would otherwise drop the
-        // user right back to the connect screen mid-stream. WebView.restoreState() re-navigates
-        // to the same page from its saved history — it can't resume exact video playback
-        // position since that's live JS/DOM state, but at least it doesn't lose the page.
-        if (savedInstanceState != null && binding.webView.restoreState(savedInstanceState) != null) {
-            connected = savedInstanceState.getBoolean(STATE_CONNECTED)
-            if (connected) {
-                binding.preConnectSection.visibility = View.GONE
-                binding.webView.visibility = View.VISIBLE
+        val savedBaseUrl = savedInstanceState?.getString(STATE_BASE_URL)
+        if (savedBaseUrl != null) {
+            restoreConnection(savedInstanceState, savedBaseUrl)
+        }
+    }
+
+    private fun setUpBrowseSection() {
+        val spanCount = resources.getInteger(R.integer.video_grid_span_count)
+        binding.browseRecyclerView.layoutManager = GridLayoutManager(this, spanCount)
+        binding.browseBackButton.setOnClickListener { onBrowseBack() }
+        binding.browseSortSpinner.adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_dropdown_item,
+            arrayOf(getString(R.string.sort_name), getString(R.string.sort_date), getString(R.string.sort_size))
+        )
+        binding.browseSortSpinner.setOnItemSelectedListener(object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                val newSort = SORT_VALUES.getOrElse(position) { SORT_VALUES[0] }
+                if (newSort != currentSort) {
+                    currentSort = newSort
+                    loadBrowse(currentPath, currentFlat)
+                }
             }
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+        })
+        binding.browseFlatSwitch.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked != currentFlat) {
+                currentFlat = isChecked
+                loadBrowse("", currentFlat)
+            }
+        }
+    }
+
+    private fun setUpPlayerSection() {
+        binding.playerBackButton.setOnClickListener { onPlayerBack() }
+        binding.playerAutoplaySwitch.isChecked = true
+        binding.playerAutoplaySwitch.setOnCheckedChangeListener { _, isChecked ->
+            exoPlayer?.pauseAtEndOfMediaItems = !isChecked
+        }
+        binding.playerShuffleSwitch.setOnCheckedChangeListener { _, isChecked ->
+            exoPlayer?.shuffleModeEnabled = isChecked
+        }
+    }
+
+    private fun restoreConnection(savedInstanceState: Bundle, savedBaseUrl: String) {
+        baseUrl = savedBaseUrl
+        val isFolderMode = savedInstanceState.getBoolean(STATE_IS_FOLDER_MODE)
+        currentSort = savedInstanceState.getString(STATE_SORT) ?: SORT_VALUES[0]
+        currentFlat = savedInstanceState.getBoolean(STATE_FLAT)
+        libraryInfo = RemoteLibraryInfo(
+            libraryName = savedInstanceState.getString(STATE_LIBRARY_NAME).orEmpty(),
+            isFolderMode = isFolderMode,
+            defaultSort = currentSort
+        )
+        resetRemoteFollowState()
+        startRemotePollingLoop()
+        if (isFolderMode) {
+            showBrowse()
+            // A config change (e.g. rotation) drops exact mid-video playback position the same
+            // way the old WebView-based viewer did — that's live player state, not something a
+            // recreated Activity can restore — but folder position/sort/flatten do carry over.
+            loadBrowse(savedInstanceState.getString(STATE_PATH).orEmpty(), currentFlat)
+        } else {
+            loadSingleFileAndPlay(savedBaseUrl)
         }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
-        binding.webView.saveState(outState)
-        outState.putBoolean(STATE_CONNECTED, connected)
+        outState.putString(STATE_BASE_URL, baseUrl)
+        outState.putString(STATE_LIBRARY_NAME, libraryInfo?.libraryName)
+        outState.putBoolean(STATE_IS_FOLDER_MODE, libraryInfo?.isFolderMode ?: false)
+        outState.putString(STATE_PATH, currentPath)
+        outState.putString(STATE_SORT, currentSort)
+        outState.putBoolean(STATE_FLAT, currentFlat)
     }
 
     override fun onStart() {
         super.onStart()
         startDiscovery()
+        if (baseUrl != null) startRemotePollingLoop()
     }
 
     override fun onStop() {
         stopDiscovery()
+        mainHandler.removeCallbacks(remotePollRunnable)
         super.onStop()
     }
+
+    override fun onDestroy() {
+        releasePlayer()
+        super.onDestroy()
+    }
+
+    // ---- Connecting ----------------------------------------------------------------------
 
     private fun connect() {
         val url = normalizeUrl(binding.addressInput.text?.toString().orEmpty())
@@ -177,14 +240,71 @@ class WatchActivity : BaseActivity() {
             Toast.makeText(this, R.string.watch_invalid_address, Toast.LENGTH_SHORT).show()
             return
         }
-        loadUrl(url)
+        connectTo(url)
     }
 
-    private fun loadUrl(url: String) {
-        connected = true
+    private fun connectTo(url: String) {
         binding.preConnectSection.visibility = View.GONE
-        binding.webView.visibility = View.VISIBLE
-        binding.webView.loadUrl(url)
+        binding.loadingProgress.visibility = View.VISIBLE
+        baseUrl = url
+        Thread {
+            val info = RemoteLibraryApi.fetchInfo(url)
+            runOnUiThread {
+                if (baseUrl != url) return@runOnUiThread // superseded by another connect attempt
+                binding.loadingProgress.visibility = View.GONE
+                if (info == null) {
+                    Toast.makeText(this, R.string.watch_connection_failed, Toast.LENGTH_LONG).show()
+                    baseUrl = null
+                    showPreConnect()
+                    return@runOnUiThread
+                }
+                libraryInfo = info
+                currentSort = info.defaultSort
+                currentFlat = false
+                currentPath = ""
+                resetRemoteFollowState()
+                startRemotePollingLoop()
+                if (info.isFolderMode) {
+                    showBrowse()
+                    loadBrowse("", false)
+                } else {
+                    loadSingleFileAndPlay(url)
+                }
+            }
+        }.start()
+    }
+
+    private fun loadSingleFileAndPlay(url: String) {
+        Thread {
+            val result = RemoteLibraryApi.fetchBrowse(url, "", "name", false)
+            runOnUiThread {
+                if (baseUrl != url) return@runOnUiThread
+                val video = result?.videos?.firstOrNull()
+                if (video == null) {
+                    Toast.makeText(this, R.string.watch_connection_failed, Toast.LENGTH_LONG).show()
+                    disconnect()
+                    return@runOnUiThread
+                }
+                currentVideos = listOf(video)
+                openPlayer(listOf(video), 0)
+            }
+        }.start()
+    }
+
+    private fun disconnect() {
+        mainHandler.removeCallbacks(remotePollRunnable)
+        resetRemoteFollowState()
+        releasePlayer()
+        baseUrl = null
+        libraryInfo = null
+        currentPath = ""
+        currentVideos = emptyList()
+        // A reconnect might go to a different host — drop this one so ensureBrowseAdapter()
+        // builds a fresh adapter bound to the new base URL instead of reusing this one's,
+        // which would otherwise keep pointing thumbnails at the old host.
+        browseAdapter = null
+        binding.browseRecyclerView.adapter = null
+        showPreConnect()
     }
 
     private fun normalizeUrl(rawInput: String): String? {
@@ -208,6 +328,261 @@ class WatchActivity : BaseActivity() {
         val path = uri.path.orEmpty()
         return "http://$host:$port$path"
     }
+
+    // ---- Browsing --------------------------------------------------------------------------
+
+    private fun loadBrowse(path: String, flat: Boolean) {
+        val url = baseUrl ?: return
+        binding.browseRecyclerView.visibility = View.INVISIBLE
+        binding.browseLoadingProgress.visibility = View.VISIBLE
+        binding.browseEmptyText.visibility = View.GONE
+        Thread {
+            val result = RemoteLibraryApi.fetchBrowse(url, path, currentSort, flat)
+            runOnUiThread {
+                if (baseUrl != url) return@runOnUiThread
+                binding.browseLoadingProgress.visibility = View.GONE
+                if (result == null) {
+                    binding.browseEmptyText.text = getString(R.string.watch_browse_failed)
+                    binding.browseEmptyText.visibility = View.VISIBLE
+                    return@runOnUiThread
+                }
+                currentPath = result.effectivePath
+                currentFlat = flat
+                currentVideos = result.videos
+                binding.browseTitle.text = result.title
+                binding.browseFlatSwitch.isChecked = flat
+
+                val adapter = ensureBrowseAdapter(url)
+                val items = mutableListOf<BrowseItem>()
+                result.subfolders.forEach { name ->
+                    val childPath = if (currentPath.isEmpty()) name else "$currentPath/$name"
+                    items.add(BrowseItem.Folder(name, childPath))
+                }
+                result.videos.forEach { video ->
+                    val subtitle = if (flat && video.folderPath.isNotEmpty()) video.folderPath else null
+                    items.add(BrowseItem.Video(video, subtitle))
+                }
+                adapter.submitList(items)
+                if (items.isEmpty()) {
+                    binding.browseEmptyText.text = getString(R.string.watch_browse_empty)
+                    binding.browseEmptyText.visibility = View.VISIBLE
+                } else {
+                    binding.browseRecyclerView.visibility = View.VISIBLE
+                }
+            }
+        }.start()
+    }
+
+    private fun ensureBrowseAdapter(url: String): BrowseAdapter {
+        var adapter = browseAdapter
+        if (adapter == null) {
+            adapter = BrowseAdapter(
+                baseUrl = url,
+                onFolderClick = { folder -> loadBrowse(folder.path, currentFlat) },
+                onVideoClick = { item -> openPlayerFromBrowse(item.video) }
+            )
+            browseAdapter = adapter
+            binding.browseRecyclerView.adapter = adapter
+            val spanCount = resources.getInteger(R.integer.video_grid_span_count)
+            (binding.browseRecyclerView.layoutManager as GridLayoutManager).spanSizeLookup =
+                adapter.spanSizeLookup(spanCount)
+        }
+        return adapter
+    }
+
+    private fun onBrowseBack() {
+        if (currentFlat || currentPath.isEmpty()) {
+            disconnect()
+        } else {
+            loadBrowse(currentPath.substringBeforeLast('/', ""), false)
+        }
+    }
+
+    // ---- Playback --------------------------------------------------------------------------
+
+    private fun openPlayerFromBrowse(video: RemoteVideo) {
+        val index = currentVideos.indexOfFirst { it.id == video.id }.coerceAtLeast(0)
+        openPlayer(currentVideos, index)
+    }
+
+    private fun openPlayer(videos: List<RemoteVideo>, startIndex: Int) {
+        val url = baseUrl ?: return
+        followingRemote = false
+        val player = ensurePlayer()
+        val hasPlaylist = videos.size > 1
+        binding.playerAutoplaySwitch.visibility = if (hasPlaylist) View.VISIBLE else View.GONE
+        binding.playerShuffleSwitch.visibility = if (hasPlaylist) View.VISIBLE else View.GONE
+        player.pauseAtEndOfMediaItems = !binding.playerAutoplaySwitch.isChecked
+        player.shuffleModeEnabled = hasPlaylist && binding.playerShuffleSwitch.isChecked
+        player.setMediaItems(videos.map { toMediaItem(url, it) }, startIndex, 0L)
+        player.prepare()
+        player.playWhenReady = true
+        binding.playerTitle.text = videos.getOrNull(startIndex)?.name ?: ""
+        applyControllerVisible(true)
+        showPlayer()
+    }
+
+    private fun toMediaItem(url: String, video: RemoteVideo): MediaItem =
+        MediaItem.Builder()
+            .setUri("$url/video?id=${video.id}")
+            .setMediaId(video.id.toString())
+            .setMimeType(video.type)
+            .setMediaMetadata(MediaMetadata.Builder().setTitle(video.name).build())
+            .build()
+
+    private fun ensurePlayer(): ExoPlayer {
+        var player = exoPlayer
+        if (player == null) {
+            player = ExoPlayer.Builder(this).build()
+            player.addListener(playerListener)
+            binding.playerView.player = player
+            exoPlayer = player
+        }
+        return player
+    }
+
+    private fun releasePlayer() {
+        exoPlayer?.let {
+            it.removeListener(playerListener)
+            it.release()
+        }
+        exoPlayer = null
+        binding.playerView.player = null
+    }
+
+    private fun applyControllerVisible(visible: Boolean) {
+        binding.playerView.setUseController(visible)
+        binding.playerTopBar.visibility = if (visible) View.VISIBLE else View.GONE
+    }
+
+    private fun onPlayerBack() {
+        if (followingRemote) {
+            // The remote is still driving this screen — there's nothing of "my own" to go back
+            // to, so back means leaving the stream entirely, same as backing out of a live TV
+            // channel someone else is controlling.
+            disconnect()
+            return
+        }
+        releasePlayer()
+        if (libraryInfo?.isFolderMode == true) {
+            showBrowse()
+        } else {
+            disconnect()
+        }
+    }
+
+    // ---- Screen visibility -------------------------------------------------------------------
+
+    private fun showPreConnect() {
+        screen = Screen.PRE_CONNECT
+        binding.preConnectSection.visibility = View.VISIBLE
+        binding.browseSection.visibility = View.GONE
+        binding.playerSection.visibility = View.GONE
+        setImmersiveMode(false)
+    }
+
+    private fun showBrowse() {
+        screen = Screen.BROWSE
+        binding.preConnectSection.visibility = View.GONE
+        binding.browseSection.visibility = View.VISIBLE
+        binding.playerSection.visibility = View.GONE
+        setImmersiveMode(false)
+    }
+
+    private fun showPlayer() {
+        screen = Screen.PLAYER
+        binding.preConnectSection.visibility = View.GONE
+        binding.browseSection.visibility = View.GONE
+        binding.playerSection.visibility = View.VISIBLE
+        setImmersiveMode(true)
+    }
+
+    /** Hides/restores the status and navigation bars — the player fills the whole screen. */
+    private fun setImmersiveMode(enabled: Boolean) {
+        WindowCompat.setDecorFitsSystemWindows(window, !enabled)
+        val controller = WindowInsetsControllerCompat(window, window.decorView)
+        if (enabled) {
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+        } else {
+            controller.show(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+
+    // ---- Following a host's /remote pick --------------------------------------------------
+
+    private fun resetRemoteFollowState() {
+        followingRemote = false
+        remoteFollowVideoId = null
+        remoteFollowLoading = false
+        lastPlayRevision = -1L
+        lastSeekRevision = -1L
+    }
+
+    private fun startRemotePollingLoop() {
+        mainHandler.removeCallbacks(remotePollRunnable)
+        mainHandler.post(remotePollRunnable)
+    }
+
+    private fun applyRemoteState(state: RemoteState?) {
+        state ?: return
+        if (state.videoId != null) {
+            if (state.videoId != remoteFollowVideoId) {
+                remoteFollowVideoId = state.videoId
+                lastPlayRevision = state.playRevision
+                lastSeekRevision = state.seekRevision
+                enterRemoteFollow(state.videoId, state.playing)
+                return
+            }
+            if (remoteFollowLoading) return
+            if (state.playRevision != lastPlayRevision) {
+                lastPlayRevision = state.playRevision
+                if (state.playing) exoPlayer?.play() else exoPlayer?.pause()
+            }
+            if (state.seekRevision != lastSeekRevision) {
+                lastSeekRevision = state.seekRevision
+                state.seekSeconds?.let { exoPlayer?.seekTo((it * 1000).toLong()) }
+            }
+        } else if (remoteFollowVideoId != null) {
+            // The host left remote mode — hand control back to a normal player for whatever's
+            // already loaded, the same as the bare web viewer falling back to a normal watch page.
+            remoteFollowVideoId = null
+            followingRemote = false
+            if (screen == Screen.PLAYER) applyControllerVisible(true)
+        }
+    }
+
+    private fun enterRemoteFollow(videoId: Int, playing: Boolean) {
+        val url = baseUrl ?: return
+        followingRemote = true
+        remoteFollowLoading = true
+        Thread {
+            val video = RemoteLibraryApi.fetchVideo(url, videoId)
+            runOnUiThread {
+                // The remote may have moved on again while this metadata fetch was in flight.
+                if (baseUrl != url || remoteFollowVideoId != videoId) return@runOnUiThread
+                remoteFollowLoading = false
+                val player = ensurePlayer()
+                val item = if (video != null) {
+                    toMediaItem(url, video)
+                } else {
+                    MediaItem.Builder().setUri("$url/video?id=$videoId").build()
+                }
+                player.pauseAtEndOfMediaItems = false
+                player.shuffleModeEnabled = false
+                player.setMediaItem(item)
+                player.prepare()
+                player.playWhenReady = playing
+                binding.playerTitle.text = video?.name ?: ""
+                binding.playerAutoplaySwitch.visibility = View.GONE
+                binding.playerShuffleSwitch.visibility = View.GONE
+                applyControllerVisible(false)
+                showPlayer()
+            }
+        }.start()
+    }
+
+    // ---- Discovery ---------------------------------------------------------------------------
 
     private fun startDiscovery() {
         if (discoveryActive) return
@@ -301,31 +676,23 @@ class WatchActivity : BaseActivity() {
             row.findViewById<TextView>(R.id.hostAddress).text = "${host.host}:${host.port}"
             row.setOnClickListener {
                 binding.addressInput.setText("${host.host}:${host.port}")
-                loadUrl("http://${host.host}:${host.port}")
+                connectTo("http://${host.host}:${host.port}")
             }
             container.addView(row)
         }
         binding.discoveryEmptyText.visibility = if (hosts.isEmpty()) View.VISIBLE else View.GONE
     }
 
-    /** Hides/restores the status and navigation bars for fullscreen video playback. */
-    private fun setImmersiveMode(enabled: Boolean) {
-        WindowCompat.setDecorFitsSystemWindows(window, !enabled)
-        val controller = WindowInsetsControllerCompat(window, window.decorView)
-        if (enabled) {
-            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            controller.hide(WindowInsetsCompat.Type.systemBars())
-        } else {
-            controller.show(WindowInsetsCompat.Type.systemBars())
-        }
-    }
-
-    override fun onDestroy() {
-        binding.webView.destroy()
-        super.onDestroy()
-    }
-
     companion object {
-        private const val STATE_CONNECTED = "connected"
+        private const val REMOTE_POLL_INTERVAL_MS = 1500L
+        // Must stay in the same order as the labels populating browseSortSpinner's adapter.
+        private val SORT_VALUES = arrayOf("name", "date", "size")
+
+        private const val STATE_BASE_URL = "baseUrl"
+        private const val STATE_LIBRARY_NAME = "libraryName"
+        private const val STATE_IS_FOLDER_MODE = "isFolderMode"
+        private const val STATE_PATH = "path"
+        private const val STATE_SORT = "sort"
+        private const val STATE_FLAT = "flat"
     }
 }

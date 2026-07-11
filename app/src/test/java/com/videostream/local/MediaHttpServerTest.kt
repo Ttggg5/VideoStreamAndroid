@@ -378,4 +378,89 @@ class MediaHttpServerTest {
             body.contains("location.href = '/watch?id=' + currentId;")
         )
     }
+
+    @Test
+    fun `api info reports library name, folder mode, and default sort`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true, libraryName = "My Library", defaultSort = "date")
+
+        val (code, body) = get(httpServer, "/api/info")
+
+        assertEquals(200, code)
+        assertTrue(body.contains("\"libraryName\":\"My Library\""))
+        assertTrue(body.contains("\"isFolderMode\":true"))
+        assertTrue(body.contains("\"defaultSort\":\"date\""))
+    }
+
+    @Test
+    fun `api browse returns videos and subfolders as json instead of html`() {
+        val entries = listOf(
+            VideoEntry(id = 1, name = "root.mp4", folderPath = "", uri = fakeUri(), sizeBytes = 42, lastModified = 1000),
+            VideoEntry(id = 2, name = "nested.mp4", folderPath = "Movies", uri = fakeUri())
+        )
+        val httpServer = startServer(entries, isFolderMode = true)
+
+        val (rootCode, rootBody) = get(httpServer, "/api/browse")
+        assertEquals(200, rootCode)
+        assertTrue(rootBody.contains("\"id\":1"))
+        assertTrue(rootBody.contains("\"name\":\"root.mp4\""))
+        assertTrue(rootBody.contains("\"sizeBytes\":42"))
+        assertTrue(rootBody.contains("\"lastModified\":1000"))
+        assertTrue(rootBody.contains("\"type\":\"video/mp4\""))
+        assertTrue(rootBody.contains("\"subfolders\":[\"Movies\"]"))
+        assertFalse("nested video shouldn't show until its folder is opened", rootBody.contains("nested.mp4"))
+
+        val (folderCode, folderBody) = get(httpServer, "/api/browse?path=Movies")
+        assertEquals(200, folderCode)
+        assertTrue(folderBody.contains("\"name\":\"nested.mp4\""))
+    }
+
+    @Test
+    fun `api browse escapes video and folder names for safe json`() {
+        val entries = listOf(
+            VideoEntry(id = 1, name = "quote\"video.mp4", folderPath = "", uri = fakeUri())
+        )
+        val httpServer = startServer(entries, isFolderMode = true)
+
+        val (code, body) = get(httpServer, "/api/browse")
+
+        assertEquals(200, code)
+        assertTrue(body.contains("quote\\\"video.mp4"))
+    }
+
+    @Test
+    fun `api browse 404s for an unknown path`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true)
+
+        val (code, _) = get(httpServer, "/api/browse?path=DoesNotExist")
+
+        assertEquals(404, code)
+    }
+
+    @Test
+    fun `api video returns metadata for a single video by id regardless of folder`() {
+        val entries = listOf(
+            VideoEntry(id = 1, name = "root.mp4", folderPath = "", uri = fakeUri()),
+            VideoEntry(id = 2, name = "nested.mkv", folderPath = "Movies", uri = fakeUri())
+        )
+        val httpServer = startServer(entries, isFolderMode = true)
+
+        val (code, body) = get(httpServer, "/api/video?id=2")
+
+        assertEquals(200, code)
+        assertTrue(body.contains("\"name\":\"nested.mkv\""))
+        assertTrue(body.contains("\"folderPath\":\"Movies\""))
+        assertTrue(body.contains("\"type\":\"video/x-matroska\""))
+    }
+
+    @Test
+    fun `api video 404s for an unknown id`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true)
+
+        val (code, _) = get(httpServer, "/api/video?id=999")
+
+        assertEquals(404, code)
+    }
 }

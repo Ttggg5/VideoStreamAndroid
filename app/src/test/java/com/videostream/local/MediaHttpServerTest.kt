@@ -62,6 +62,16 @@ class MediaHttpServerTest {
         return code to body
     }
 
+    /** GETs [path] and returns its `Cache-Control` response header, or null if absent. */
+    private fun getCacheControlHeader(server: MediaHttpServer, path: String): String? {
+        val connection = URL("http://127.0.0.1:${server.listeningPort}$path").openConnection() as HttpURLConnection
+        connection.requestMethod = "GET"
+        connection.responseCode
+        val header = connection.getHeaderField("Cache-Control")
+        connection.disconnect()
+        return header
+    }
+
     @Test
     fun `video names containing HTML are escaped rather than injected as markup`() {
         val entries = listOf(
@@ -462,5 +472,20 @@ class MediaHttpServerTest {
         val (code, _) = get(httpServer, "/api/video?id=999")
 
         assertEquals(404, code)
+    }
+
+    @Test
+    fun `remote, browse, watch, and bare-follow pages are never cached`() {
+        // A cached copy of any of these is exactly what would make a reloaded page (e.g. the
+        // control panel right after selecting a video) show stale state instead of the real
+        // current pick — see MediaHttpServer's Cache-Control comment on each of them.
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true)
+        post(httpServer, "/remote/select?id=1")
+
+        assertEquals("no-store", getCacheControlHeader(httpServer, "/remote"))
+        assertEquals("no-store", getCacheControlHeader(httpServer, "/browse"))
+        assertEquals("no-store", getCacheControlHeader(httpServer, "/watch?id=1"))
+        assertEquals("no-store", getCacheControlHeader(httpServer, "/watch?id=1&remote=1"))
     }
 }

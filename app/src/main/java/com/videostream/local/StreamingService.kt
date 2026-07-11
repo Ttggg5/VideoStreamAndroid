@@ -37,6 +37,13 @@ class StreamingService : Service() {
     val isStreaming = MutableLiveData(false)
     val serverUrl = MutableLiveData<String?>(null)
     val videoName = MutableLiveData<String?>(null)
+    /**
+     * Whether the active stream is a folder (vs. a single file) — the authoritative source for
+     * this, since [HostActivity] itself may be a fresh instance that never made the pick (e.g.
+     * the user backed out and reopened Host while a previous instance's stream is still running)
+     * and can't tell folder from single-file mode from its own local state alone.
+     */
+    val isFolderStream = MutableLiveData(false)
 
     private var server: MediaHttpServer? = null
     private var wakeLock: PowerManager.WakeLock? = null
@@ -166,6 +173,7 @@ class StreamingService : Service() {
         }
 
         videoName.postValue(libraryLabel)
+        isFolderStream.postValue(isFolderMode)
         val ip = NetworkUtils.getLocalIpAddress()
         val url = if (ip != null) "http://$ip:$port" else null
         serverUrl.postValue(url)
@@ -192,6 +200,7 @@ class StreamingService : Service() {
         isStreaming.postValue(false)
         serverUrl.postValue(null)
         videoName.postValue(null)
+        isFolderStream.postValue(false)
 
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()

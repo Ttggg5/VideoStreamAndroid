@@ -479,7 +479,14 @@ class MediaHttpServer(
             </body>
             </html>
         """.trimIndent()
-        return newFixedLengthResponse(Response.Status.OK, "text/html", html)
+        val response = newFixedLengthResponse(Response.Status.OK, "text/html", html)
+        // Without this, a browser/WebView can serve a cached copy of this page back on
+        // location.reload() (most visibly on /remote right after selecting a video, or on the
+        // bare remote-follow player right after a video switch) instead of actually re-fetching
+        // the now-current state from the server — this page always reflects live state, so it
+        // must never be served stale.
+        response.addHeader("Cache-Control", "no-store")
+        return response
     }
 
     private fun watchPage(entry: VideoEntry, sortMode: SortMode, flat: Boolean, remote: Boolean): Response {
@@ -847,7 +854,14 @@ class MediaHttpServer(
             </body>
             </html>
         """.trimIndent()
-        return newFixedLengthResponse(Response.Status.OK, "text/html", html)
+        val response = newFixedLengthResponse(Response.Status.OK, "text/html", html)
+        // Without this, a browser/WebView can serve a cached copy of this page back on
+        // location.reload() (most visibly on /remote right after selecting a video, or on the
+        // bare remote-follow player right after a video switch) instead of actually re-fetching
+        // the now-current state from the server — this page always reflects live state, so it
+        // must never be served stale.
+        response.addHeader("Cache-Control", "no-store")
+        return response
     }
 
     /**
@@ -933,7 +947,14 @@ class MediaHttpServer(
             </body>
             </html>
         """.trimIndent()
-        return newFixedLengthResponse(Response.Status.OK, "text/html", html)
+        val response = newFixedLengthResponse(Response.Status.OK, "text/html", html)
+        // Without this, a browser/WebView can serve a cached copy of this page back on
+        // location.reload() (most visibly on /remote right after selecting a video, or on the
+        // bare remote-follow player right after a video switch) instead of actually re-fetching
+        // the now-current state from the server — this page always reflects live state, so it
+        // must never be served stale.
+        response.addHeader("Cache-Control", "no-store")
+        return response
     }
 
     /**
@@ -1226,7 +1247,14 @@ class MediaHttpServer(
             </body>
             </html>
         """.trimIndent()
-        return newFixedLengthResponse(Response.Status.OK, "text/html", html)
+        val response = newFixedLengthResponse(Response.Status.OK, "text/html", html)
+        // Without this, a browser/WebView can serve a cached copy of this page back on
+        // location.reload() (most visibly on /remote right after selecting a video, or on the
+        // bare remote-follow player right after a video switch) instead of actually re-fetching
+        // the now-current state from the server — this page always reflects live state, so it
+        // must never be served stale.
+        response.addHeader("Cache-Control", "no-store")
+        return response
     }
 
     private fun remoteStateJson(): Response {

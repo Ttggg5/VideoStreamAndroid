@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.widget.AdapterView
@@ -16,9 +17,11 @@ import android.widget.ArrayAdapter
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.addCallback
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.core.view.updateLayoutParams
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
@@ -126,6 +129,7 @@ class WatchActivity : BaseActivity() {
 
         setUpBrowseSection()
         setUpPlayerSection()
+        setUpWindowInsets()
 
         onBackPressedDispatcher.addCallback(this) {
             when (screen) {
@@ -179,6 +183,26 @@ class WatchActivity : BaseActivity() {
         }
         binding.playerShuffleSwitch.setOnCheckedChangeListener { _, isChecked ->
             exoPlayer?.shuffleModeEnabled = isChecked
+        }
+    }
+
+    /**
+     * browseSection's back button/title row is the one piece of this screen shown while system
+     * bars are visible (playerSection stays immersive — see [setImmersiveMode]), so unlike every
+     * other screen in the app it can't just rely on the window's default system-bar fitting: this
+     * activity toggles [WindowCompat.setDecorFitsSystemWindows] itself on entering/leaving the
+     * player, and that toggling is exactly the kind of thing that leaves content drawing under
+     * the status bar/notch on some OEM skins if only relied on implicitly. Padding it by the
+     * actual status bar inset keeps it clear regardless.
+     */
+    private fun setUpWindowInsets() {
+        val baseTopMargin = (binding.browseBackButton.layoutParams as ViewGroup.MarginLayoutParams).topMargin
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
+            val statusBarTop = insets.getInsets(WindowInsetsCompat.Type.statusBars()).top
+            binding.browseBackButton.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                topMargin = baseTopMargin + statusBarTop
+            }
+            insets
         }
     }
 

@@ -194,6 +194,7 @@
             android:id="@+id/browseRecyclerView"
             android:layout_width="0dp"
             android:layout_height="0dp"
+            android:visibility="invisible"
             android:clipToPadding="false"
             android:paddingHorizontal="12dp"
             android:paddingBottom="16dp"
@@ -201,17 +202,20 @@
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
-            tools:listitem="@layout/item_browse_video" />
+            tools:listitem="@layout/item_browse_video"
+            tools:visibility="visible" />
 
         <ProgressBar
             android:id="@+id/browseLoadingProgress"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:indeterminate="true"
+            android:visibility="gone"
             app:layout_constraintTop_toBottomOf="@id/browseOptionsRow"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
+            app:layout_constraintEnd_toEndOf="parent"
+            tools:visibility="visible" />
 
         <TextView
             android:id="@+id/browseEmptyText"

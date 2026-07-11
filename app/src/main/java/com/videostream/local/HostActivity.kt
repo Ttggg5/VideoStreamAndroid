@@ -199,6 +199,14 @@ class HostActivity : BaseActivity() {
         return null
     }
 
+    /** Only folder mode has more than one video for a remote to choose between. */
+    private fun updateRemoteControlButtonVisibility() {
+        val currentService = service ?: return
+        val streaming = currentService.isStreaming.value == true
+        val isFolder = currentService.isFolderStream.value == true
+        binding.remoteControlButton.visibility = if (streaming && isFolder) View.VISIBLE else View.GONE
+    }
+
     private fun attachObservers() {
         val currentService = service ?: return
         if (observedService === currentService) return
@@ -212,9 +220,7 @@ class HostActivity : BaseActivity() {
             binding.toggleButton.isEnabled = streaming || selectedUri != null
             binding.chooseFileButton.isEnabled = !streaming
             binding.chooseFolderButton.isEnabled = !streaming
-            // Only folder mode has more than one video for a remote to choose between.
-            binding.remoteControlButton.visibility =
-                if (streaming && selectedIsFolder) View.VISIBLE else View.GONE
+            updateRemoteControlButtonVisibility()
             if (!streaming) {
                 binding.statusText.text = getString(R.string.status_idle)
             }
@@ -229,6 +235,10 @@ class HostActivity : BaseActivity() {
                 binding.selectedFileText.text = name
             }
         }
+        // The authoritative source for whether the *active* stream is a folder — this Activity
+        // instance may never have picked it itself (e.g. it was recreated while a previous
+        // instance's stream is still running), so selectedIsFolder alone can't be trusted here.
+        currentService.isFolderStream.observe(this) { updateRemoteControlButtonVisibility() }
     }
 
     private fun ensureNotificationPermissionThenStart() {

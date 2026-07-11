@@ -335,12 +335,15 @@ class MediaHttpServerTest {
         val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
         val httpServer = startServer(entries, isFolderMode = true)
 
+        // Note: the page's script always references getElementById('exitRemoteButton') (single
+        // quotes) so it can no-op when there's nothing to attach to — only the actual button
+        // element (id="..." in double quotes) indicates whether one was rendered.
         val (_, beforeBody) = get(httpServer, "/remote")
-        assertFalse("nothing to exit yet with no video selected", beforeBody.contains("exitRemoteButton"))
+        assertFalse("nothing to exit yet with no video selected", beforeBody.contains("id=\"exitRemoteButton\""))
 
         post(httpServer, "/remote/select?id=1")
         val (_, afterBody) = get(httpServer, "/remote")
-        assertTrue("exit control should appear once something's selected", afterBody.contains("exitRemoteButton"))
+        assertTrue("exit control should appear once something's selected", afterBody.contains("id=\"exitRemoteButton\""))
     }
 
     @Test

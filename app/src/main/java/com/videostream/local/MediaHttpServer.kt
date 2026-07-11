@@ -28,11 +28,15 @@ import java.util.concurrent.atomic.AtomicReference
  *
  * `/remote` is a second way to pick a video: instead of a viewer browsing and choosing for
  * themselves, whoever loads `/remote` (the host app's own screen, or any other browser on the
- * LAN) picks on everyone else's behalf, like a TV remote, and gets a full transport control
- * panel (play/pause/seek/volume) for whatever's currently selected. Every `/browse` and `/watch`
- * page polls `/remote/state`, and once anything's been selected there, hands off entirely to a
- * bare, control-less full-screen player that just follows along — no viewer keeps their own
- * play/pause/seek controls once a remote is driving.
+ * LAN) picks on everyone else's behalf, like a TV remote, and gets a transport control panel
+ * (play/pause/seek) for whatever's currently selected — the panel decodes the video just enough
+ * to drive a real seek bar, but stays muted and never shows the picture, since this device is
+ * controlling the stream, not watching it. Every `/browse` and `/watch` page polls
+ * `/remote/state`, and once anything's been selected there, hands off entirely to a bare,
+ * control-less full-screen player that just follows along — no viewer keeps their own
+ * play/pause/seek controls once a remote is driving. Leaving remote mode (the control panel's
+ * "Exit remote mode" button, which calls `/remote/clear`) hands every viewer straight back to a
+ * normal watch page with its own controls.
  */
 class MediaHttpServer(
     port: Int,
@@ -138,6 +142,7 @@ class MediaHttpServer(
             "/remote/state" -> remoteStateJson()
             "/remote/select" -> handleRemoteSelect(session)
             "/remote/command" -> handleRemoteCommand(session)
+            "/remote/clear" -> handleRemoteClear()
             else -> newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Not found")
         }
     }
@@ -826,7 +831,12 @@ class MediaHttpServer(
 
                 function poll() {
                   fetch('/remote/state').then(function (r) { return r.json(); }).then(function (state) {
-                    if (state.videoId === null) return;
+                    if (state.videoId === null) {
+                      // The remote's been cleared — hand control back to a normal watch page
+                      // with its own controls instead of sitting on a bare screen forever.
+                      location.href = '/watch?id=' + currentId;
+                      return;
+                    }
                     if (state.videoId !== currentId) {
                       currentId = state.videoId;
                       lastPlayRevision = state.playRevision;
@@ -914,12 +924,19 @@ class MediaHttpServer(
         }
         val playerSection = if (currentEntry != null) {
             """
+            <div class="nowPlayingCard">
+              <img class="nowPlayingThumb" src="/thumbnail?id=${currentEntry.id}" alt="">
+              <div class="nowPlayingInfo">
+                <p class="nowPlayingLabel">Now playing on every connected viewer</p>
+                <p class="nowPlayingTitle">${escapeHtml(currentEntry.name)}</p>
+              </div>
+              <button type="button" id="exitRemoteButton" class="exitButton">Exit remote mode</button>
+            </div>
             <div class="player">
-              <video id="player" class="video-js vjs-big-play-centered" controls preload="auto" poster="/thumbnail?id=${currentEntry.id}">
+              <video id="player" class="video-js" controls preload="auto">
                 <source src="/video?id=${currentEntry.id}" type="${guessVideoMimeType(currentEntry.name)}">
               </video>
             </div>
-            <p id="nowPlaying" class="nowPlaying">${escapeHtml(currentEntry.name)}</p>
             """.trimIndent()
         } else {
             """<p class="placeholder">Pick a video below to start controlling playback on every connected viewer.</p>"""
@@ -942,22 +959,38 @@ class MediaHttpServer(
                 }
                 h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -0.01em; }
                 .subtitle { margin: 0 0 16px; color: #888; font-size: 13px; }
-                .player { background: #000; border-radius: 12px; overflow: hidden; aspect-ratio: 16 / 9; margin-bottom: 8px; }
-                .video-js { width: 100%; height: 100%; }
-                .video-js .vjs-tech { object-fit: contain; }
-                .video-js .vjs-big-play-button {
-                  width: 64px; height: 64px; line-height: 64px; margin: -32px 0 0 -32px;
-                  font-size: 26px; border: none; border-radius: 50%;
-                  background-color: rgba(0, 0, 0, 0.55);
+                .nowPlayingCard {
+                  display: flex; align-items: center; gap: 12px; padding: 10px; margin-bottom: 8px;
+                  background: #1c1f28; border-radius: 12px;
                 }
-                .video-js:hover .vjs-big-play-button,
-                .video-js .vjs-big-play-button:focus,
-                .video-js .vjs-big-play-button:hover { border: none; background-color: var(--accent); }
-                .video-js .vjs-control-bar { background-color: rgba(17, 19, 25, 0.85); }
+                .nowPlayingThumb { width: 64px; aspect-ratio: 16 / 9; object-fit: cover; background: #000; border-radius: 8px; flex-shrink: 0; }
+                .nowPlayingInfo { flex: 1; min-width: 0; }
+                .nowPlayingLabel { margin: 0 0 2px; font-size: 11px; color: #888; }
+                .nowPlayingTitle { margin: 0; font-size: 14px; word-break: break-word; }
+                .exitButton {
+                  flex-shrink: 0; padding: 8px 14px; border-radius: 999px; border: none; cursor: pointer;
+                  background: #262a36; color: #eee; font-size: 12px; font: inherit;
+                }
+                .exitButton:hover { background: #333846; }
+                /* This is a control panel, not a viewing screen — the video itself stays loaded
+                   (so the seek bar/duration are real) but its picture, poster, and anything else
+                   tied to actually watching it are hidden; only the transport controls show. */
+                .player { background: #1c1f28; border-radius: 12px; overflow: hidden; margin-bottom: 8px; }
+                .video-js { width: 100%; height: 40px; }
+                .video-js .vjs-tech,
+                .video-js .vjs-poster,
+                .video-js .vjs-big-play-button,
+                .video-js .vjs-fullscreen-control,
+                .video-js .vjs-volume-panel,
+                .video-js .vjs-loading-spinner {
+                  display: none !important;
+                }
+                .video-js .vjs-control-bar {
+                  position: relative; background-color: transparent; opacity: 1; height: 40px;
+                }
                 .video-js .vjs-slider { background-color: rgba(255, 255, 255, 0.15); }
-                .video-js .vjs-play-progress, .video-js .vjs-volume-level { background-color: var(--accent); }
+                .video-js .vjs-play-progress { background-color: var(--accent); }
                 .video-js .vjs-load-progress div { background: rgba(74, 95, 255, 0.35); }
-                .nowPlaying { margin: 0 0 20px; font-size: 13px; color: #ccc; word-break: break-word; }
                 .placeholder { margin: 0 0 20px; padding: 32px; text-align: center; color: #888; background: #1c1f28; border-radius: 12px; }
                 .bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; font-size: 13px; }
                 .bar .label { color: #888; margin-right: 2px; }
@@ -1014,7 +1047,9 @@ class MediaHttpServer(
                 var initialVideoId = ${currentEntry?.id ?: "null"};
                 var lastPlayRevision = ${current.playRevision};
                 var lastSeekRevision = ${current.seekRevision};
-                var player = document.getElementById('player') ? videojs('player', { autoplay: true }) : null;
+                // Muted: this device is a remote, not a viewer — it decodes the video only to
+                // drive a real seek bar/duration, not to be watched or listened to itself.
+                var player = document.getElementById('player') ? videojs('player', { autoplay: true, muted: true }) : null;
                 // Set while applying a command that arrived from /remote/state, so the player
                 // events that fire as a side effect don't get echoed straight back as a new
                 // command — otherwise every incoming play/pause/seek would immediately re-send
@@ -1041,6 +1076,15 @@ class MediaHttpServer(
                   cards[i].addEventListener('click', function () {
                     var id = parseInt(this.getAttribute('data-id'), 10);
                     fetch('/remote/select?id=' + id, { method: 'POST' }).then(function () {
+                      location.reload();
+                    }).catch(function () {});
+                  });
+                }
+
+                var exitButton = document.getElementById('exitRemoteButton');
+                if (exitButton) {
+                  exitButton.addEventListener('click', function () {
+                    fetch('/remote/clear', { method: 'POST' }).then(function () {
                       location.reload();
                     }).catch(function () {});
                   });
@@ -1129,6 +1173,15 @@ class MediaHttpServer(
             }
             else -> return newFixedLengthResponse(Response.Status.BAD_REQUEST, "text/plain", "Unknown action")
         }
+        return newFixedLengthResponse(Response.Status.OK, "text/plain", "OK")
+    }
+
+    /**
+     * Leaves remote mode: clears the current pick so every bare, control-less viewer page hands
+     * playback back to a normal watch page with its own controls — see [bareRemotePlayerPage].
+     */
+    private fun handleRemoteClear(): Response {
+        remoteSelection.updateAndGet { RemoteSelection(revision = it.revision + 1, playRevision = it.playRevision + 1) }
         return newFixedLengthResponse(Response.Status.OK, "text/plain", "OK")
     }
 

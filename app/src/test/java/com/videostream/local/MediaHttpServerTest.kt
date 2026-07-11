@@ -316,4 +316,57 @@ class MediaHttpServerTest {
         assertEquals(200, code)
         assertTrue(body.contains("controls preload"))
     }
+
+    @Test
+    fun `remote page hides the video picture behind a control-only panel, with now-playing info`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true)
+        post(httpServer, "/remote/select?id=1")
+
+        val (_, body) = get(httpServer, "/remote")
+
+        assertTrue("host player should stay muted rather than play audio itself", body.contains("muted: true"))
+        assertTrue("video picture itself should be hidden, not shown", body.contains(".vjs-tech"))
+        assertTrue("the currently playing video's name should be surfaced", body.contains("nowPlayingTitle"))
+    }
+
+    @Test
+    fun `remote page offers an exit control only once a video is selected`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true)
+
+        val (_, beforeBody) = get(httpServer, "/remote")
+        assertFalse("nothing to exit yet with no video selected", beforeBody.contains("exitRemoteButton"))
+
+        post(httpServer, "/remote/select?id=1")
+        val (_, afterBody) = get(httpServer, "/remote")
+        assertTrue("exit control should appear once something's selected", afterBody.contains("exitRemoteButton"))
+    }
+
+    @Test
+    fun `clearing the remote selection resets state back to unselected`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true)
+        post(httpServer, "/remote/select?id=1")
+
+        val (clearCode, _) = post(httpServer, "/remote/clear")
+
+        assertEquals(200, clearCode)
+        val (_, body) = get(httpServer, "/remote/state")
+        assertTrue(body.contains("\"videoId\":null"))
+    }
+
+    @Test
+    fun `bare player hands control back to a normal watch page once the remote is cleared`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true)
+
+        val (code, body) = get(httpServer, "/watch?id=1&remote=1")
+
+        assertEquals(200, code)
+        assertTrue(
+            "bare player should fall back to the normal watch page once state.videoId goes null",
+            body.contains("location.href = '/watch?id=' + currentId;")
+        )
+    }
 }

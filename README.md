@@ -66,6 +66,15 @@ with a built-in screen to open another device's stream.
   device's page in an embedded browser, so you don't need a separate
   laptop/browser to view a stream; another copy of this app works as the
   viewer too.
+- **Rotates and adapts to bigger screens**: every screen in the app now
+  supports landscape (previously locked to portrait) with a dedicated
+  layout — the two Host/Watch options sit side by side instead of
+  stacked, `HostActivity` splits into a picker column and a
+  status/action column, and `WatchActivity`'s address/discovery panel
+  becomes a capped-width side panel instead of stretching full-width. On
+  tablets (`sw600dp+`) every screen also gets wider side margins instead
+  of stretching content edge-to-edge. Picking a file/folder and an
+  in-progress stream both survive a rotation instead of resetting.
 
 Any modern browser plays the stream directly with a `<video>` tag —
 no app or plugin needed on the viewing device. Desktop media players like
@@ -150,6 +159,8 @@ app/src/main/java/com/videostream/local/
   NetworkUtils.kt          Finds the device's local IPv4 address
 app/src/main/assets/videojs/
   video.min.js, video-js.min.css   Bundled video.js player (Apache-2.0), served at /assets/videojs/...
+app/src/main/res/layout-land/     Landscape layouts for MainActivity, HostActivity, WatchActivity
+app/src/main/res/values(-sw600dp)/dimens.xml   screen_horizontal_margin — wider on tablets
 app/src/test/java/com/videostream/local/
   MediaHttpServerTest.kt   Starts a real MediaHttpServer on a loopback port and hits it with HTTP requests
   NetworkUtilsTest.kt      Sanity-checks getLocalIpAddress()'s return shape
@@ -252,3 +263,9 @@ plug in `r0adkll/upload-google-play` (or similar) once those secrets exist.
   both devices; some Wi-Fi hotspot implementations isolate clients from
   each other (AP/client isolation) and block it, so a discovered host
   may not always show up even when the manual address still works fine.
+- Rotating the device while **watching** a stream reconnects to the same
+  page (its `WebView` navigation history is restored), but doesn't
+  resume the exact video playback position — that's live JS/DOM state
+  inside the page, which a config-change recreation doesn't preserve.
+  Picking a file/folder on the **Host** screen and an in-progress stream
+  itself both survive rotation without resetting.

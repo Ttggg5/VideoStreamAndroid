@@ -21,8 +21,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:screenOrientation="portrait"
-            android:configChanges="orientation|screenSize|keyboardHidden">
+            android:configChanges="keyboardHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -32,13 +31,12 @@
         <activity
             android:name=".HostActivity"
             android:exported="false"
-            android:screenOrientation="portrait"
-            android:configChanges="orientation|screenSize|keyboardHidden" />
+            android:configChanges="keyboardHidden" />
 
         <activity
             android:name=".WatchActivity"
             android:exported="false"
-            android:configChanges="orientation|screenSize|keyboardHidden" />
+            android:configChanges="keyboardHidden" />
 
         <service
             android:name=".StreamingService"

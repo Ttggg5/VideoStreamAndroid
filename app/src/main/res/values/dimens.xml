@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Outer padding/margin for the main screens. Wider on large screens (see
+         values-sw600dp/dimens.xml) so content doesn't stretch edge-to-edge on a tablet. -->
+    <dimen name="screen_horizontal_margin">24dp</dimen>
+</resources>

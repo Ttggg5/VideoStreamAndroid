@@ -17,6 +17,7 @@ import android.widget.ArrayAdapter
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.os.BundleCompat
 import androidx.documentfile.provider.DocumentFile
 import com.videostream.local.databinding.ActivityHostBinding
 
@@ -84,6 +85,26 @@ class HostActivity : AppCompatActivity() {
                 ensureNotificationPermissionThenStart()
             }
         }
+
+        // Picking a file/folder is stored in plain fields, not view state, so it survives
+        // a rotation (or any other config-change recreation, e.g. entering landscape) on its
+        // own — otherwise the picked video would silently disappear from under the user.
+        if (savedInstanceState != null) {
+            selectedUri = BundleCompat.getParcelable(savedInstanceState, STATE_SELECTED_URI, Uri::class.java)
+            selectedName = savedInstanceState.getString(STATE_SELECTED_NAME)
+            selectedIsFolder = savedInstanceState.getBoolean(STATE_SELECTED_IS_FOLDER)
+            if (selectedUri != null) {
+                applySelectionToUi()
+                if (!selectedIsFolder) loadThumbnailPreview(selectedUri!!)
+            }
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putParcelable(STATE_SELECTED_URI, selectedUri)
+        outState.putString(STATE_SELECTED_NAME, selectedName)
+        outState.putBoolean(STATE_SELECTED_IS_FOLDER, selectedIsFolder)
     }
 
     override fun onStart() {
@@ -108,10 +129,8 @@ class HostActivity : AppCompatActivity() {
         selectedUri = uri
         selectedIsFolder = false
         selectedName = queryDisplayName(uri) ?: uri.lastPathSegment ?: "video"
-        binding.selectedFileText.text = getString(R.string.selected_video, selectedName)
-        binding.toggleButton.isEnabled = true
+        applySelectionToUi()
         loadThumbnailPreview(uri)
-        setFolderOptionsVisible(false)
     }
 
     private fun onFolderSelected(uri: Uri) {
@@ -119,10 +138,19 @@ class HostActivity : AppCompatActivity() {
         selectedUri = uri
         selectedIsFolder = true
         selectedName = DocumentFile.fromTreeUri(this, uri)?.name ?: "Folder"
-        binding.selectedFileText.text = getString(R.string.selected_folder, selectedName)
-        binding.toggleButton.isEnabled = true
+        applySelectionToUi()
         hideThumbnailPreview()
-        setFolderOptionsVisible(true)
+    }
+
+    /** Reflects [selectedName]/[selectedIsFolder] in the UI, whether freshly picked or restored. */
+    private fun applySelectionToUi() {
+        binding.selectedFileText.text = if (selectedIsFolder) {
+            getString(R.string.selected_folder, selectedName)
+        } else {
+            getString(R.string.selected_video, selectedName)
+        }
+        binding.toggleButton.isEnabled = true
+        setFolderOptionsVisible(selectedIsFolder)
     }
 
     /** The default-sort picker only makes sense once there's a folder of videos to sort. */
@@ -240,5 +268,9 @@ class HostActivity : AppCompatActivity() {
     companion object {
         // Must stay in the same order as the labels populating defaultSortSpinner's adapter.
         private val SORT_VALUES = arrayOf("name", "date", "size")
+
+        private const val STATE_SELECTED_URI = "selectedUri"
+        private const val STATE_SELECTED_NAME = "selectedName"
+        private const val STATE_SELECTED_IS_FOLDER = "selectedIsFolder"
     }
 }

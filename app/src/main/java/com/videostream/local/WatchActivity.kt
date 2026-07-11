@@ -35,6 +35,7 @@ class WatchActivity : AppCompatActivity() {
     private val discoveredHosts = LinkedHashMap<String, DiscoveredHost>()
     private var discoveryListener: NsdManager.DiscoveryListener? = null
     private var discoveryActive = false
+    private var connected = false
 
     private data class DiscoveredHost(val name: String, val host: String, val port: Int)
 
@@ -101,6 +102,24 @@ class WatchActivity : AppCompatActivity() {
                 onBackPressedDispatcher.onBackPressed()
             }
         }
+
+        // Config-change recreation (e.g. rotating to landscape) would otherwise drop the
+        // user right back to the connect screen mid-stream. WebView.restoreState() re-navigates
+        // to the same page from its saved history — it can't resume exact video playback
+        // position since that's live JS/DOM state, but at least it doesn't lose the page.
+        if (savedInstanceState != null && binding.webView.restoreState(savedInstanceState) != null) {
+            connected = savedInstanceState.getBoolean(STATE_CONNECTED)
+            if (connected) {
+                binding.preConnectSection.visibility = View.GONE
+                binding.webView.visibility = View.VISIBLE
+            }
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        binding.webView.saveState(outState)
+        outState.putBoolean(STATE_CONNECTED, connected)
     }
 
     override fun onStart() {
@@ -123,6 +142,7 @@ class WatchActivity : AppCompatActivity() {
     }
 
     private fun loadUrl(url: String) {
+        connected = true
         binding.preConnectSection.visibility = View.GONE
         binding.webView.visibility = View.VISIBLE
         binding.webView.loadUrl(url)
@@ -252,5 +272,9 @@ class WatchActivity : AppCompatActivity() {
     override fun onDestroy() {
         binding.webView.destroy()
         super.onDestroy()
+    }
+
+    companion object {
+        private const val STATE_CONNECTED = "connected"
     }
 }

@@ -7,6 +7,15 @@
     android:padding="@dimen/screen_horizontal_margin"
     tools:context=".HostActivity">
 
+    <!-- Landscape splits the screen into a picker column (left) and a status/action
+         column (right) instead of stacking everything in one tall column. -->
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/midGuideline"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintGuide_percent="0.55" />
+
     <TextView
         android:id="@+id/selectedFileText"
         android:layout_width="0dp"
@@ -16,7 +25,7 @@
         android:text="@string/no_video_selected"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        app:layout_constraintEnd_toEndOf="@id/midGuideline" />
 
     <LinearLayout
         android:id="@+id/pickerButtons"
@@ -26,7 +35,7 @@
         android:orientation="horizontal"
         app:layout_constraintTop_toBottomOf="@id/selectedFileText"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintEnd_toEndOf="@id/midGuideline">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/chooseFileButton"
@@ -49,7 +58,7 @@
     <ImageView
         android:id="@+id/thumbnailPreview"
         android:layout_width="0dp"
-        android:layout_height="180dp"
+        android:layout_height="130dp"
         android:layout_marginTop="16dp"
         android:background="#000000"
         android:scaleType="centerCrop"
@@ -57,7 +66,7 @@
         android:contentDescription="@string/selected_video_thumbnail"
         app:layout_constraintTop_toBottomOf="@id/pickerButtons"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintEnd_toEndOf="@id/midGuideline"
         tools:visibility="visible" />
 
     <LinearLayout
@@ -70,7 +79,7 @@
         android:visibility="gone"
         app:layout_constraintTop_toBottomOf="@id/thumbnailPreview"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintEnd_toEndOf="@id/midGuideline"
         tools:visibility="visible">
 
         <TextView
@@ -91,24 +100,28 @@
         android:id="@+id/statusText"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginStart="24dp"
         android:gravity="center"
         android:textSize="16sp"
         android:text="@string/status_idle"
-        app:layout_constraintTop_toBottomOf="@id/sortOptionRow"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/toggleButton"
+        app:layout_constraintStart_toEndOf="@id/midGuideline"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintVertical_chainStyle="packed" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/toggleButton"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="24dp"
+        android:layout_marginStart="24dp"
+        android:layout_marginTop="16dp"
         android:enabled="false"
         android:text="@string/start_streaming"
         app:icon="@drawable/ic_play_arrow"
         app:layout_constraintTop_toBottomOf="@id/statusText"
-        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toEndOf="@id/midGuideline"
         app:layout_constraintEnd_toEndOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

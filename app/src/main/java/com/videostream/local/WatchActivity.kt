@@ -765,7 +765,6 @@ class WatchActivity : BaseActivity() {
             row.findViewById<TextView>(R.id.hostName).text = host.name
             row.findViewById<TextView>(R.id.hostAddress).text = "${host.host}:${host.port}"
             row.setOnClickListener {
-                binding.addressInput.setText("${host.host}:${host.port}")
                 connectTo("http://${host.host}:${host.port}")
             }
             container.addView(row)

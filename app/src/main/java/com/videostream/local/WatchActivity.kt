@@ -1,7 +1,9 @@
 package com.videostream.local
 
 import android.content.Context
+import android.content.res.ColorStateList
 import android.content.res.Configuration
+import android.graphics.Color
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.net.Uri
@@ -15,6 +17,9 @@ import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
+import android.widget.ImageButton
+import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.addCallback
@@ -29,6 +34,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.recyclerview.widget.GridLayoutManager
+import com.google.android.material.color.MaterialColors
 import com.videostream.local.databinding.ActivityWatchBinding
 
 /**
@@ -74,9 +80,22 @@ class WatchActivity : BaseActivity() {
     private var currentBrowseTitle: String = ""
 
     private var exoPlayer: ExoPlayer? = null
+    /** Persisted across videos and player instances (unlike the [ExoPlayer] itself, which gets
+     *  recreated whenever the user backs out to browse and opens something else) — see
+     *  [setUpAutoplayButton]/[openPlayer]. Default true matches the old Autoplay switch's default. */
+    private var autoplayEnabled = true
+    /** Mirrors the built-in Shuffle button's own live [ExoPlayer.getShuffleModeEnabled] state
+     *  (updated via [Player.Listener.onShuffleModeEnabledChanged] below) so it carries over to
+     *  the next [ExoPlayer] instance the same way [autoplayEnabled] does. */
+    private var shuffleEnabled = false
+    private var autoplayButton: ImageButton? = null
     private val playerListener = object : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             binding.playerTitle.text = mediaItem?.mediaMetadata?.title ?: ""
+        }
+
+        override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+            shuffleEnabled = shuffleModeEnabled
         }
 
         override fun onPlayerError(error: PlaybackException) {
@@ -187,11 +206,10 @@ class WatchActivity : BaseActivity() {
         val player = exoPlayer
         if (player != null) {
             binding.playerTitle.text = player.currentMediaItem?.mediaMetadata?.title ?: ""
-            val showPlaylistControls = player.mediaItemCount > 1 && !followingRemote
-            binding.playerAutoplaySwitch.visibility = if (showPlaylistControls) View.VISIBLE else View.GONE
-            binding.playerShuffleSwitch.visibility = if (showPlaylistControls) View.VISIBLE else View.GONE
-            binding.playerAutoplaySwitch.isChecked = !player.pauseAtEndOfMediaItems
-            binding.playerShuffleSwitch.isChecked = player.shuffleModeEnabled
+            // The Autoplay button's tint (updateAutoplayButtonTint, called from
+            // setUpAutoplayButton above) and the built-in Shuffle button's own icon state
+            // (synced automatically once binding.playerView.player is set above) both already
+            // reflect the current state without anything further needed here.
             applyControllerVisible(!followingRemote)
         }
 
@@ -235,14 +253,61 @@ class WatchActivity : BaseActivity() {
 
     private fun setUpPlayerSection() {
         binding.playerBackButton.setOnClickListener { onPlayerBack() }
-        binding.playerAutoplaySwitch.isChecked = true
-        binding.playerAutoplaySwitch.setOnCheckedChangeListener { _, isChecked ->
-            exoPlayer?.pauseAtEndOfMediaItems = !isChecked
-        }
-        binding.playerShuffleSwitch.setOnCheckedChangeListener { _, isChecked ->
-            exoPlayer?.shuffleModeEnabled = isChecked
-        }
+        setUpAutoplayButton()
     }
+
+    /**
+     * Ties Autoplay and Shuffle into the [androidx.media3.ui.PlayerView]'s own control bar
+     * instead of a separate pair of switches in the app's own UI — Shuffle is media3's built-in
+     * button ([androidx.media3.ui.PlayerView.setShowShuffleButton], which already toggles
+     * [ExoPlayer.getShuffleModeEnabled] on tap by itself); Autoplay has no built-in equivalent,
+     * so a matching custom button is added into `exo_basic_controls` — the always-visible bottom
+     * icon row, a stable id media3-ui has exposed for exactly this since ExoPlayer's classic
+     * `PlayerControlView`. Sizing/padding match media3's own small icon buttons
+     * (`exo_small_icon_width/height`, `exo_small_icon_padding_horizontal/vertical`) so it sits
+     * naturally alongside them instead of looking bolted on.
+     */
+    private fun setUpAutoplayButton() {
+        binding.playerView.setShowShuffleButton(true)
+        val basicControls = binding.playerView.findViewById<LinearLayout>(androidx.media3.ui.R.id.exo_basic_controls)
+            ?: return
+        val margin = dpToPx(2)
+        val padding = dpToPx(12)
+        val button = ImageButton(this, null, android.R.attr.borderlessButtonStyle).apply {
+            layoutParams = LinearLayout.LayoutParams(dpToPx(48), dpToPx(48)).apply {
+                marginStart = margin
+                marginEnd = margin
+            }
+            setPadding(padding, padding, padding, padding)
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setImageResource(R.drawable.ic_autoplay)
+            contentDescription = getString(R.string.watch_autoplay)
+            setOnClickListener { setAutoplayEnabled(!autoplayEnabled) }
+        }
+        autoplayButton = button
+        basicControls.addView(button, 0)
+        updateAutoplayButtonTint()
+    }
+
+    private fun setAutoplayEnabled(enabled: Boolean) {
+        autoplayEnabled = enabled
+        exoPlayer?.pauseAtEndOfMediaItems = !enabled
+        updateAutoplayButtonTint()
+    }
+
+    /** Accent color while on, matching the rest of the app's toggle-active convention (see e.g.
+     *  the folder-tile icon tint), plain white — matching every other control-bar icon's default
+     *  — while off. */
+    private fun updateAutoplayButtonTint() {
+        val color = if (autoplayEnabled) {
+            MaterialColors.getColor(this, com.google.android.material.R.attr.colorPrimary, Color.WHITE)
+        } else {
+            Color.WHITE
+        }
+        autoplayButton?.imageTintList = ColorStateList.valueOf(color)
+    }
+
+    private fun dpToPx(dp: Int): Int = (dp * resources.displayMetrics.density).toInt()
 
     /**
      * browseSection's back button/title row is the one piece of this screen shown while system
@@ -493,10 +558,8 @@ class WatchActivity : BaseActivity() {
         followingRemote = false
         val player = ensurePlayer()
         val hasPlaylist = videos.size > 1
-        binding.playerAutoplaySwitch.visibility = if (hasPlaylist) View.VISIBLE else View.GONE
-        binding.playerShuffleSwitch.visibility = if (hasPlaylist) View.VISIBLE else View.GONE
-        player.pauseAtEndOfMediaItems = !binding.playerAutoplaySwitch.isChecked
-        player.shuffleModeEnabled = hasPlaylist && binding.playerShuffleSwitch.isChecked
+        player.pauseAtEndOfMediaItems = !autoplayEnabled
+        player.shuffleModeEnabled = hasPlaylist && shuffleEnabled
         player.setMediaItems(videos.map { toMediaItem(url, it) }, startIndex, 0L)
         player.prepare()
         player.playWhenReady = true
@@ -664,8 +727,6 @@ class WatchActivity : BaseActivity() {
                 player.prepare()
                 player.playWhenReady = playing
                 binding.playerTitle.text = video?.name ?: ""
-                binding.playerAutoplaySwitch.visibility = View.GONE
-                binding.playerShuffleSwitch.visibility = View.GONE
                 applyControllerVisible(false)
                 showPlayer()
             }

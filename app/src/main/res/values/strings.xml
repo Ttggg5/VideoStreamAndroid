@@ -51,7 +51,6 @@
     <string name="watch_back">Back</string>
     <string name="watch_view_all_videos">All videos</string>
     <string name="watch_autoplay">Autoplay</string>
-    <string name="watch_shuffle">Shuffle</string>
     <string name="watch_browse_failed">Couldn\'t load the video list. Check the connection and try again.</string>
     <string name="watch_browse_empty">No videos found here.</string>
     <string name="watch_playback_error">Couldn\'t play this video.</string>

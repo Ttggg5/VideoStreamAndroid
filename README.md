@@ -214,12 +214,13 @@ VLC can also open the `http://<ip>:<port>/video` URL directly.
    back up a level, and use the **Sort** spinner or **All videos** switch
    the same way you would on the web page. For a single-file stream,
    playback just starts.
-4. Tapping a video opens the native player — **Autoplay** and
-   **Shuffle** switches sit in its top bar when there's more than one
-   video to play through, and Prev/Next live in the player's own control
-   bar. If the host ever uses **Remote Control**, this screen's controls
-   disappear and it just follows along with whatever the host is doing,
-   the same as any other connected viewer.
+4. Tapping a video opens the native player — **Autoplay** (a custom
+   button added into the player's own control bar) and **Shuffle**
+   (media3's built-in shuffle button) sit right in the control bar
+   itself rather than as separate switches elsewhere on screen, and
+   Prev/Next live there too. If the host ever uses **Remote Control**,
+   this screen's controls disappear and it just follows along with
+   whatever the host is doing, the same as any other connected viewer.
 
 ## Project layout
 

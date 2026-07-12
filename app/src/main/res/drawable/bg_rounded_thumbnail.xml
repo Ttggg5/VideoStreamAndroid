@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Shared shape for the browse grid's folder/video thumbnail tiles; each item sets its own
+     android:backgroundTint (folder placeholder slate vs. video placeholder black) and relies
+     on android:clipToOutline to round its actual content (icon or thumbnail bitmap) to match. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="@dimen/browse_thumbnail_corner_radius" />
+    <solid android:color="@android:color/white" />
+</shape>

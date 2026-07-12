@@ -7,4 +7,7 @@
     <!-- Settings > Accent color swatches. -->
     <dimen name="accent_swatch_size">44dp</dimen>
     <dimen name="accent_swatch_margin">14dp</dimen>
+
+    <!-- Corner radius for the browse grid's folder/video thumbnail tiles. -->
+    <dimen name="browse_thumbnail_corner_radius">12dp</dimen>
 </resources>

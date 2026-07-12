@@ -11,13 +11,16 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.os.PowerManager
 import android.provider.OpenableColumns
+import android.provider.Settings
 import android.view.View
 import android.widget.ArrayAdapter
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.core.os.BundleCompat
 import androidx.documentfile.provider.DocumentFile
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.videostream.local.databinding.ActivityHostBinding
 
 /** Lets the user pick a video file or a folder of videos and broadcast it to the local network. */
@@ -57,6 +60,12 @@ class HostActivity : BaseActivity() {
 
     private val requestNotificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
+    ) { maybeRequestIgnoreBatteryOptimizations() }
+
+    // The system settings screen has no meaningful result to check — whether the user granted
+    // it or backed out, either way streaming should proceed.
+    private val requestIgnoreBatteryOptimizations = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
     ) { startStreaming() }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -248,8 +257,40 @@ class HostActivity : BaseActivity() {
         ) {
             requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         } else {
-            startStreaming()
+            maybeRequestIgnoreBatteryOptimizations()
         }
+    }
+
+    /**
+     * Battery optimization can throttle or kill the streaming service after long stretches in
+     * the background, even though it's a foreground service. Asking once for an exemption makes
+     * background streaming much more reliable; declining is remembered so this doesn't nag on
+     * every single stream start.
+     */
+    private fun maybeRequestIgnoreBatteryOptimizations() {
+        val powerManager = getSystemService(PowerManager::class.java)
+        if (powerManager.isIgnoringBatteryOptimizations(packageName) ||
+            AppSettings.getBatteryOptimizationPromptDismissed(this)
+        ) {
+            startStreaming()
+            return
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.battery_optimization_title)
+            .setMessage(R.string.battery_optimization_message)
+            .setCancelable(false)
+            .setPositiveButton(R.string.battery_optimization_allow) { _, _ ->
+                val intent = Intent(
+                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    Uri.parse("package:$packageName")
+                )
+                requestIgnoreBatteryOptimizations.launch(intent)
+            }
+            .setNegativeButton(R.string.battery_optimization_skip) { _, _ ->
+                AppSettings.setBatteryOptimizationPromptDismissed(this, true)
+                startStreaming()
+            }
+            .show()
     }
 
     private fun startStreaming() {

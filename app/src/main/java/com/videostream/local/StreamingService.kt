@@ -10,6 +10,7 @@ import android.content.pm.ServiceInfo
 import android.net.Uri
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
+import android.net.wifi.WifiManager
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
@@ -47,6 +48,7 @@ class StreamingService : Service() {
 
     private var server: MediaHttpServer? = null
     private var wakeLock: PowerManager.WakeLock? = null
+    private var wifiLock: WifiManager.WifiLock? = null
     private var nsdManager: NsdManager? = null
     private var nsdRegistrationListener: NsdManager.RegistrationListener? = null
 
@@ -145,6 +147,7 @@ class StreamingService : Service() {
         // check below, and that error path tears back down through stopStreaming() instead of
         // returning early.
         acquireWakeLock()
+        acquireWifiLock()
         val notification = buildNotification(getString(R.string.notification_starting))
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
@@ -196,6 +199,7 @@ class StreamingService : Service() {
         server = null
 
         releaseWakeLock()
+        releaseWifiLock()
 
         isStreaming.postValue(false)
         serverUrl.postValue(null)
@@ -218,6 +222,31 @@ class StreamingService : Service() {
     private fun releaseWakeLock() {
         wakeLock?.let { if (it.isHeld) it.release() }
         wakeLock = null
+    }
+
+    /**
+     * Without this, some devices drop Wi-Fi into a low-power/sleep state once the screen is
+     * off, which stalls the HTTP server's open connections even though the CPU wake lock above
+     * keeps the process itself alive.
+     */
+    private fun acquireWifiLock() {
+        if (wifiLock != null) return
+        val wifiManager = applicationContext.getSystemService(WIFI_SERVICE) as? WifiManager ?: return
+        val lockMode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            WifiManager.WIFI_MODE_FULL_LOW_LATENCY
+        } else {
+            @Suppress("DEPRECATION")
+            WifiManager.WIFI_MODE_FULL_HIGH_PERF
+        }
+        wifiLock = wifiManager.createWifiLock(lockMode, "$TAG:streamingWifiLock").apply {
+            setReferenceCounted(false)
+            acquire()
+        }
+    }
+
+    private fun releaseWifiLock() {
+        wifiLock?.let { if (it.isHeld) it.release() }
+        wifiLock = null
     }
 
     /** Advertises this stream via mDNS/NSD so [WatchActivity] can discover it without a typed address. */
@@ -296,6 +325,7 @@ class StreamingService : Service() {
         unregisterNsdService()
         server?.stop()
         releaseWakeLock()
+        releaseWifiLock()
         super.onDestroy()
     }
 

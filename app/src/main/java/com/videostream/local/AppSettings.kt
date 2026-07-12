@@ -18,6 +18,7 @@ object AppSettings {
     private const val KEY_THEME_MODE = "theme_mode"
     private const val KEY_HTTP_PORT = "http_port"
     private const val KEY_KEEP_SCREEN_ON = "keep_screen_on_watching"
+    private const val KEY_BATTERY_OPT_PROMPT_DISMISSED = "battery_opt_prompt_dismissed"
 
     const val DEFAULT_HTTP_PORT = 8080
     const val MIN_HTTP_PORT = 1024
@@ -88,5 +89,13 @@ object AppSettings {
 
     fun setKeepScreenOnWhileWatching(context: Context, enabled: Boolean) {
         prefs(context).edit().putBoolean(KEY_KEEP_SCREEN_ON, enabled).apply()
+    }
+
+    /** Whether the user has already dismissed the "exempt from battery optimization" prompt once. */
+    fun getBatteryOptimizationPromptDismissed(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_BATTERY_OPT_PROMPT_DISMISSED, false)
+
+    fun setBatteryOptimizationPromptDismissed(context: Context, dismissed: Boolean) {
+        prefs(context).edit().putBoolean(KEY_BATTERY_OPT_PROMPT_DISMISSED, dismissed).apply()
     }
 }

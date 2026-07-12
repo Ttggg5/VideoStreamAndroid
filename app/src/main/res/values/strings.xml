@@ -38,6 +38,11 @@
     <string name="notification_no_network">No network connection detected</string>
     <string name="notification_stop_action">Stop</string>
 
+    <string name="battery_optimization_title">Keep streaming reliably in the background?</string>
+    <string name="battery_optimization_message">Android may slow down or stop this app after a while if you switch away while streaming. Exempting it from battery optimization keeps the stream running smoothly.</string>
+    <string name="battery_optimization_allow">Allow</string>
+    <string name="battery_optimization_skip">Not now</string>
+
     <string name="watch_address_hint">Host address (e.g. 192.168.1.23)</string>
     <string name="watch_connect">Connect</string>
     <string name="watch_hint">Tap a host above, or enter its address manually and tap Connect</string>

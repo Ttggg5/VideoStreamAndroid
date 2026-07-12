@@ -92,7 +92,12 @@ with a built-in screen to open another device's stream.
   page itself works the same from any browser.
 - **Stay alive**: the server runs inside a foreground `Service`, so
   streaming keeps going even if you switch away from the app (the
-  notification shows the URL and has a Stop action).
+  notification shows the URL and has a Stop action). A partial wake
+  lock and a Wi-Fi lock are held for as long as it's running so neither
+  the CPU nor the Wi-Fi radio go to sleep mid-stream, and the first time
+  you start streaming you're asked to exempt the app from battery
+  optimization so Android doesn't throttle it during long background
+  stretches (declining is remembered — it won't ask again).
 - **Watch, natively**: the app's own **Watch a Stream** screen is not a
   browser — it's native views talking to the host's JSON API
   (`/api/info`, `/api/browse`, `/api/video`, alongside the existing

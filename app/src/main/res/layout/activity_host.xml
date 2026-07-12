@@ -20,7 +20,7 @@
 
     <LinearLayout
         android:id="@+id/pickerButtons"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
         android:orientation="horizontal"
@@ -28,19 +28,28 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
+        <!-- 0dp+weight (rather than wrap_content) keeps this pair from overflowing the
+             screen on narrow devices or at larger font scales; maxLines+ellipsize is the
+             fallback if a button still runs out of room. -->
         <com.google.android.material.button.MaterialButton
             android:id="@+id/chooseFileButton"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginEnd="8dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
             android:text="@string/choose_video"
             app:icon="@drawable/ic_videocam" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/chooseFolderButton"
             style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
             android:text="@string/choose_folder"
             app:icon="@drawable/ic_folder" />
 

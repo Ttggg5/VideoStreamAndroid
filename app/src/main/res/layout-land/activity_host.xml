@@ -27,6 +27,10 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="@id/midGuideline" />
 
+    <!-- This row only has ~55% of the screen width to work with (everything left of
+         midGuideline), too little for icon+text buttons at typical landscape phone widths,
+         so landscape drops the labels and keeps icon-only buttons instead of risking their
+         text getting clipped; contentDescription keeps them accessible. -->
     <LinearLayout
         android:id="@+id/pickerButtons"
         android:layout_width="wrap_content"
@@ -39,18 +43,19 @@
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/chooseFileButton"
+            style="@style/Widget.Material3.Button.IconButton.Filled"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginEnd="8dp"
-            android:text="@string/choose_video"
+            android:contentDescription="@string/choose_video"
             app:icon="@drawable/ic_videocam" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/chooseFolderButton"
-            style="@style/Widget.Material3.Button.OutlinedButton"
+            style="@style/Widget.Material3.Button.IconButton.Outlined"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="@string/choose_folder"
+            android:contentDescription="@string/choose_folder"
             app:icon="@drawable/ic_folder" />
 
     </LinearLayout>

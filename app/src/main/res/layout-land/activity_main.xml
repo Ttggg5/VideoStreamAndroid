@@ -70,7 +70,8 @@
             android:focusable="true"
             app:cardCornerRadius="20dp"
             app:cardElevation="1dp"
-            app:strokeWidth="0dp">
+            app:strokeColor="@color/card_stroke_selector"
+            app:strokeWidth="2dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -124,7 +125,8 @@
             android:focusable="true"
             app:cardCornerRadius="20dp"
             app:cardElevation="1dp"
-            app:strokeWidth="0dp">
+            app:strokeColor="@color/card_stroke_selector"
+            app:strokeWidth="2dp">
 
             <LinearLayout
                 android:layout_width="match_parent"

@@ -227,6 +227,33 @@ VLC can also open the `http://<ip>:<port>/video` URL directly.
    this screen's controls disappear and it just follows along with
    whatever the host is doing, the same as any other connected viewer.
 
+### Android TV
+
+The app declares itself Android TV-compatible (`android.software.leanback`
+and `android.hardware.touchscreen` are both marked `android:required="false"`,
+and `MainActivity` carries a `LEANBACK_LAUNCHER` intent-filter category plus
+an `android:banner`), so it shows up as a launchable app/row on the TV home
+screen rather than being hidden from TV devices on the Play Store.
+
+Everything runs the same as on phones/tablets — **Host a Video** turns the
+TV (or a TV box) into a stream source, **Watch a Stream** plays what another
+device is hosting — just navigated with a D-pad/remote instead of touch.
+Every clickable element in the app (the Host/Watch cards, buttons, the
+folder/video grid, the discovered-hosts list) is already focusable, `values-
+sw600dp` gives the browse grid a wider layout on TV-sized screens the same
+way it does on tablets, and media3's `PlayerView` controls handle D-pad
+input out of the box; the Host/Watch cards on the landing screen also get a
+visible focus outline (`card_stroke_selector`) since a `MaterialCardView`
+has no built-in one. The **Remote Control** screen (`/remote`) is a plain
+`WebView`, whose D-pad focus handling inside the page itself is weaker than
+the native screens — it's meant to be opened from a phone/tablet controlling
+the TV, not used directly on the TV with a remote.
+
+This hasn't been checked on physical Android TV hardware or the Android TV
+emulator image; the changes above follow Android's documented TV
+requirements and focus-handling conventions but are only build/lint-verified
+in this environment, not run on a real TV.
+
 ## Project layout
 
 ```

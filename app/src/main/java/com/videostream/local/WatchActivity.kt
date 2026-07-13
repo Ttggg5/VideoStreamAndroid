@@ -282,6 +282,7 @@ class WatchActivity : BaseActivity() {
             scaleType = ImageView.ScaleType.FIT_CENTER
             setImageResource(R.drawable.ic_autoplay)
             contentDescription = getString(R.string.watch_autoplay)
+            isFocusable = true
             setOnClickListener { setAutoplayEnabled(!autoplayEnabled) }
         }
         autoplayButton = button

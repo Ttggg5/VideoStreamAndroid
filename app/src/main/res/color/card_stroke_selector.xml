@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Gives the MainActivity Host/Watch cards a visible border when focused via D-pad (Android
+     TV remote); invisible otherwise, since touch already gets its own ripple feedback. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="?attr/colorPrimary" android:state_focused="true" />
+    <item android:color="@android:color/transparent" />
+</selector>

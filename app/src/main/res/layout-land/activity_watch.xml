@@ -43,7 +43,8 @@
                     android:layout_height="wrap_content"
                     android:layout_marginEnd="16dp"
                     android:text="@string/watch_connect"
-                    app:icon="@drawable/ic_arrow_forward"/>
+                    app:icon="@drawable/ic_arrow_forward"
+                    android:layout_gravity="center_vertical"/>
             </TableRow>
         </TableLayout>
 

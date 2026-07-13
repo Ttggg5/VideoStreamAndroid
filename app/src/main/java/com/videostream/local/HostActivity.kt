@@ -150,16 +150,12 @@ class HostActivity : BaseActivity() {
         selectedIsFolder = true
         selectedName = DocumentFile.fromTreeUri(this, uri)?.name ?: "Folder"
         applySelectionToUi()
-        hideThumbnailPreview()
+        showFolderPreview()
     }
 
     /** Reflects [selectedName]/[selectedIsFolder] in the UI, whether freshly picked or restored. */
     private fun applySelectionToUi() {
-        binding.selectedFileText.text = if (selectedIsFolder) {
-            getString(R.string.selected_folder, selectedName)
-        } else {
-            getString(R.string.selected_video, selectedName)
-        }
+        binding.selectedFileText.text = selectedName
         binding.toggleButton.isEnabled = true
         setFolderOptionsVisible(selectedIsFolder)
     }
@@ -171,6 +167,7 @@ class HostActivity : BaseActivity() {
 
     /** Folders don't have a single representative thumbnail, so this only applies to single-file mode. */
     private fun loadThumbnailPreview(uri: Uri) {
+        hideFolderPreview()
         hideThumbnailPreview()
         Thread {
             val jpeg = ThumbnailUtil.extractThumbnailJpeg(contentResolver, uri)
@@ -183,6 +180,15 @@ class HostActivity : BaseActivity() {
                 }
             }
         }.start()
+    }
+
+    private fun showFolderPreview() {
+        hideThumbnailPreview()
+        binding.folderPreview?.visibility = View.VISIBLE
+    }
+
+    private fun hideFolderPreview() {
+        binding.folderPreview?.visibility = View.GONE
     }
 
     private fun hideThumbnailPreview() {
@@ -225,6 +231,11 @@ class HostActivity : BaseActivity() {
             binding.toggleButton.text = getString(
                 if (streaming) R.string.stop_streaming else R.string.start_streaming
             )
+            binding.toggleButton.backgroundTintList =
+                if (streaming)
+                    ContextCompat.getColorStateList(this, R.color.stop)
+                else
+                    ContextCompat.getColorStateList(this, R.color.start)
             binding.toggleButton.setIconResource(if (streaming) R.drawable.ic_stop else R.drawable.ic_play_arrow)
             binding.toggleButton.isEnabled = streaming || selectedUri != null
             binding.chooseFileButton.isEnabled = !streaming

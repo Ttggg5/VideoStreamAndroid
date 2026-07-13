@@ -8,7 +8,7 @@
     <string name="watch_a_stream">Watch a Stream</string>
     <string name="watch_a_stream_subtitle">Find and watch a stream someone else is hosting</string>
 
-    <string name="choose_video">Choose Video File</string>
+    <string name="choose_video">Choose Video</string>
     <string name="choose_folder">Choose Folder</string>
     <string name="no_video_selected">No video file selected</string>
     <string name="selected_video">Selected: %1$s</string>

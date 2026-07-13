@@ -90,6 +90,7 @@ class SettingsActivity : BaseActivity() {
                 setOnClickListener {
                     AppSettings.setAccentColor(this@SettingsActivity, color)
                     renderAccentSwatches()
+                    recreate()
                 }
             }
             if (color == selected) {

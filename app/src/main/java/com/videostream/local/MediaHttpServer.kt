@@ -5,6 +5,7 @@ import android.content.res.AssetManager
 import android.os.ParcelFileDescriptor
 import fi.iki.elonen.NanoHTTPD
 import fi.iki.elonen.NanoWSD
+import java.io.BufferedInputStream
 import java.io.ByteArrayInputStream
 import java.io.FileInputStream
 import java.io.IOException
@@ -12,6 +13,9 @@ import java.net.URLEncoder
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.atomic.AtomicReference
+
+/** Read-ahead size for [MediaHttpServer.serveVideo]'s BufferedInputStream — see its comment. */
+private const val VIDEO_STREAM_BUFFER_SIZE = 256 * 1024
 
 /**
  * Serves one or more existing video files over HTTP with byte-range support, so a
@@ -1640,7 +1644,11 @@ class MediaHttpServer(
         end = end.coerceIn(start, fileSize - 1)
         val contentLength = end - start + 1
 
-        val stream = ClosingFileInputStream(pfd)
+        // A large buffer here (rather than handing NanoHTTPD the raw stream) matters most for
+        // SAF/content:// URIs, where each underlying read() can be a FUSE/binder round trip —
+        // NanoHTTPD copies the response in small fixed-size chunks, so without this a big video
+        // turns into many small expensive reads instead of far fewer large ones.
+        val stream = BufferedInputStream(ClosingFileInputStream(pfd), VIDEO_STREAM_BUFFER_SIZE)
         var skipped = 0L
         while (skipped < start) {
             val n = stream.skip(start - skipped)

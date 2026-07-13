@@ -32,6 +32,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.recyclerview.widget.GridLayoutManager
 import com.google.android.material.color.MaterialColors
@@ -580,7 +581,19 @@ class WatchActivity : BaseActivity() {
     private fun ensurePlayer(): ExoPlayer {
         var player = exoPlayer
         if (player == null) {
-            player = ExoPlayer.Builder(this).build()
+            // DefaultLoadControl's stock thresholds are tuned for internet streaming (a 2.5s
+            // playback-start threshold and up to 50s of target buffer); over a local network the
+            // whole file is reachable at Wi-Fi speed, so both starting playback and recovering
+            // from a stall can happen much sooner without any real risk of re-stalling.
+            val loadControl = DefaultLoadControl.Builder()
+                .setBufferDurationsMs(
+                    /* minBufferMs= */ 15_000,
+                    /* maxBufferMs= */ 30_000,
+                    /* bufferForPlaybackMs= */ 500,
+                    /* bufferForPlaybackAfterRebufferMs= */ 1_000
+                )
+                .build()
+            player = ExoPlayer.Builder(this).setLoadControl(loadControl).build()
             player.addListener(playerListener)
             binding.playerView.player = player
             exoPlayer = player

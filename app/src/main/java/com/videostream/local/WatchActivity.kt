@@ -271,7 +271,10 @@ class WatchActivity : BaseActivity() {
      * fullscreen layout; playerSection already fills the whole screen either way, so rotating to
      * landscape is what actually removes the letterboxing on a normally-portrait phone) and
      * letting the existing rotation-without-recreating-the-player handling
-     * (`android:configChanges` + [onConfigurationChanged]) do the rest.
+     * (`android:configChanges` + [onConfigurationChanged]) do the rest. [playerTopBar] (the
+     * back button + title) hides along with it, out of the way of the video, same as it already
+     * does while following a host's remote pick; media3's own control bar (with the button to
+     * exit fullscreen again) still shows/hides on tap as normal.
      */
     private fun setUpFullscreenButton() {
         binding.playerView.setFullscreenButtonClickListener { fullScreen ->
@@ -281,6 +284,7 @@ class WatchActivity : BaseActivity() {
             } else {
                 ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
+            binding.playerTopBar.visibility = if (fullScreen) View.GONE else View.VISIBLE
         }
         if (isFullScreen) {
             // A freshly re-inflated PlayerView always starts showing its "enter fullscreen" icon

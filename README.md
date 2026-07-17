@@ -223,9 +223,12 @@ VLC can also open the `http://<ip>:<port>/video` URL directly.
    button added into the player's own control bar) and **Shuffle**
    (media3's built-in shuffle button) sit right in the control bar
    itself rather than as separate switches elsewhere on screen, and
-   Prev/Next live there too. If the host ever uses **Remote Control**,
-   this screen's controls disappear and it just follows along with
-   whatever the host is doing, the same as any other connected viewer.
+   Prev/Next live there too. A **fullscreen** button forces landscape
+   (and back) without losing playback position, for videos that would
+   otherwise stay letterboxed on a phone held upright. If the host ever
+   uses **Remote Control**, this screen's controls disappear and it
+   just follows along with whatever the host is doing, the same as any
+   other connected viewer.
 
 ### Android TV
 

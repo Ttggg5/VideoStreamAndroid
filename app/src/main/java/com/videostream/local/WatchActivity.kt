@@ -1,6 +1,7 @@
 package com.videostream.local
 
 import android.content.Context
+import android.content.pm.ActivityInfo
 import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.graphics.Color
@@ -90,6 +91,11 @@ class WatchActivity : BaseActivity() {
      *  the next [ExoPlayer] instance the same way [autoplayEnabled] does. */
     private var shuffleEnabled = false
     private var autoplayButton: ImageButton? = null
+    /** Tracks the player's fullscreen (forced-landscape) toggle across rotations — a freshly
+     *  re-inflated [androidx.media3.ui.PlayerView] always starts believing it isn't fullscreen
+     *  (see [setUpFullscreenButton]), so this is what [setUpFullscreenButton] uses to bring a new
+     *  one back in sync after a rotation caused by entering fullscreen in the first place. */
+    private var isFullScreen = false
     private val playerListener = object : Player.Listener {
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             binding.playerTitle.text = mediaItem?.mediaMetadata?.title ?: ""
@@ -255,6 +261,33 @@ class WatchActivity : BaseActivity() {
     private fun setUpPlayerSection() {
         binding.playerBackButton.setOnClickListener { onPlayerBack() }
         setUpAutoplayButton()
+        setUpFullscreenButton()
+    }
+
+    /**
+     * media3's fullscreen button (`exo_fullscreen`) is hidden by default and does nothing on its
+     * own — registering this listener is what makes it visible, and it's on the app to decide
+     * what "fullscreen" actually means. Here that's forcing landscape (there's no separate
+     * fullscreen layout; playerSection already fills the whole screen either way, so rotating to
+     * landscape is what actually removes the letterboxing on a normally-portrait phone) and
+     * letting the existing rotation-without-recreating-the-player handling
+     * (`android:configChanges` + [onConfigurationChanged]) do the rest.
+     */
+    private fun setUpFullscreenButton() {
+        binding.playerView.setFullscreenButtonClickListener { fullScreen ->
+            isFullScreen = fullScreen
+            requestedOrientation = if (fullScreen) {
+                ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            } else {
+                ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            }
+        }
+        if (isFullScreen) {
+            // A freshly re-inflated PlayerView always starts showing its "enter fullscreen" icon
+            // regardless of our own state above, and there's no public setter to correct that
+            // directly — clicking the real button is the only way to bring it back in sync.
+            binding.playerView.findViewById<View>(androidx.media3.ui.R.id.exo_fullscreen)?.performClick()
+        }
     }
 
     /**
@@ -608,6 +641,12 @@ class WatchActivity : BaseActivity() {
         }
         exoPlayer = null
         binding.playerView.player = null
+        // Leaving the player screen shouldn't leave the browse/pre-connect screens stuck
+        // sideways if the video was left in fullscreen.
+        if (isFullScreen) {
+            isFullScreen = false
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
     }
 
     private fun applyControllerVisible(visible: Boolean) {

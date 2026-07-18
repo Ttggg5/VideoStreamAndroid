@@ -45,6 +45,12 @@ class StreamingService : Service() {
      * and can't tell folder from single-file mode from its own local state alone.
      */
     val isFolderStream = MutableLiveData(false)
+    /**
+     * The originally-picked file/folder URI backing the active stream, so a fresh [HostActivity]
+     * (reopened while a previous instance's stream is still running) can restore the file
+     * thumbnail / folder preview it never picked itself. Null when not streaming.
+     */
+    val streamSourceUri = MutableLiveData<Uri?>(null)
 
     private var server: MediaHttpServer? = null
     private var wakeLock: PowerManager.WakeLock? = null
@@ -74,22 +80,26 @@ class StreamingService : Service() {
         val folderUriString = intent.getStringExtra(EXTRA_FOLDER_URI)
         when {
             fileUriString != null -> {
-                val entry = VideoEntry(0, name, folderPath = "", uri = Uri.parse(fileUriString))
+                val fileUri = Uri.parse(fileUriString)
+                val entry = VideoEntry(0, name, folderPath = "", uri = fileUri)
                 startStreaming(
                     entries = listOf(entry),
                     libraryLabel = name,
                     isFolderMode = false,
-                    defaultSort = DEFAULT_SORT_PARAM
+                    defaultSort = DEFAULT_SORT_PARAM,
+                    sourceUri = fileUri
                 )
             }
             folderUriString != null -> {
-                val entries = scanFolderForVideos(Uri.parse(folderUriString))
+                val folderUri = Uri.parse(folderUriString)
+                val entries = scanFolderForVideos(folderUri)
                 val label = getString(R.string.library_summary, name, entries.size)
                 startStreaming(
                     entries = entries,
                     libraryLabel = label,
                     isFolderMode = true,
-                    defaultSort = intent.getStringExtra(EXTRA_DEFAULT_SORT) ?: DEFAULT_SORT_PARAM
+                    defaultSort = intent.getStringExtra(EXTRA_DEFAULT_SORT) ?: DEFAULT_SORT_PARAM,
+                    sourceUri = folderUri
                 )
             }
         }
@@ -137,7 +147,8 @@ class StreamingService : Service() {
         entries: List<VideoEntry>,
         libraryLabel: String,
         isFolderMode: Boolean,
-        defaultSort: String
+        defaultSort: String,
+        sourceUri: Uri
     ) {
         if (isStreaming.value == true) return
 
@@ -177,6 +188,7 @@ class StreamingService : Service() {
 
         videoName.postValue(libraryLabel)
         isFolderStream.postValue(isFolderMode)
+        streamSourceUri.postValue(sourceUri)
         val ip = NetworkUtils.getLocalIpAddress()
         val url = if (ip != null) "http://$ip:$port" else null
         serverUrl.postValue(url)
@@ -205,6 +217,7 @@ class StreamingService : Service() {
         serverUrl.postValue(null)
         videoName.postValue(null)
         isFolderStream.postValue(false)
+        streamSourceUri.postValue(null)
 
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()

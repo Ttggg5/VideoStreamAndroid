@@ -255,6 +255,29 @@ class HostActivity : BaseActivity() {
         // instance may never have picked it itself (e.g. it was recreated while a previous
         // instance's stream is still running), so selectedIsFolder alone can't be trusted here.
         currentService.isFolderStream.observe(this) { updateRemoteControlButtonVisibility() }
+
+        // Restore the preview for a stream this fresh instance never picked itself (reopened Host
+        // while a previous instance's stream is still running) — otherwise the thumbnail/folder
+        // preview would be blank even though a stream is clearly active.
+        currentService.streamSourceUri.observe(this) { adoptActiveStreamIfNeeded() }
+    }
+
+    /**
+     * When this instance holds no selection of its own but the service is already streaming
+     * something (a previous instance's pick), adopt that pick so the file thumbnail / folder
+     * preview and file name all reflect the live stream. A selection this instance made itself
+     * (restored from savedInstanceState, or freshly picked) always wins and is left untouched.
+     */
+    private fun adoptActiveStreamIfNeeded() {
+        if (selectedUri != null) return
+        val currentService = service ?: return
+        if (currentService.isStreaming.value != true) return
+        val uri = currentService.streamSourceUri.value ?: return
+        selectedUri = uri
+        selectedIsFolder = currentService.isFolderStream.value == true
+        selectedName = currentService.videoName.value
+        applySelectionToUi()
+        if (selectedIsFolder) showFolderPreview() else loadThumbnailPreview(uri)
     }
 
     private fun ensureNotificationPermissionThenStart() {

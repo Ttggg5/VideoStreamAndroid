@@ -163,12 +163,21 @@ class WatchActivity : BaseActivity() {
      * re-attaching the still-alive player/adapter/connection state instead keeps playback running
      * straight through it.
      */
+    @OptIn(UnstableApi::class)
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
+        // Whether the controls (and with them the top bar) were showing before the rotation.
+        // Re-attaching the player to a freshly-inflated PlayerView below makes it re-show its
+        // controller, so this is captured now and used to hide it again afterwards — otherwise
+        // rotating a playing video pops the top bar back into view even though it had auto-hidden.
+        val controllerWasVisible = binding.playerView.isControllerFullyVisible
         binding = ActivityWatchBinding.inflate(layoutInflater)
         setContentView(binding.root)
         setUpViews()
         reattachState()
+        if (screen == Screen.PLAYER && !followingRemote && !controllerWasVisible) {
+            binding.playerView.hideController()
+        }
     }
 
     /** Wires up listeners/layout managers against the current [binding] — called once from

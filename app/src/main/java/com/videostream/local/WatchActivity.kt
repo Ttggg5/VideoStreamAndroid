@@ -37,6 +37,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
 import androidx.recyclerview.widget.GridLayoutManager
 import com.google.android.material.color.MaterialColors
 import com.videostream.local.databinding.ActivityWatchBinding
@@ -276,9 +277,13 @@ class WatchActivity : BaseActivity() {
      * auto-hidden, or vice versa.
      */
     private fun setUpControllerVisibilityBinding() {
-        binding.playerView.setControllerVisibilityListener { visibility ->
-            binding.playerTopBar.visibility = visibility
-        }
+        // PlayerView overloads setControllerVisibilityListener for the deprecated
+        // PlayerControlView.VisibilityListener as well as this one, and both are SAM-convertible
+        // from a lambda — a bare trailing lambda is ambiguous between the two, so the listener
+        // type has to be spelled out explicitly.
+        binding.playerView.setControllerVisibilityListener(
+            PlayerView.ControllerVisibilityListener { visibility -> binding.playerTopBar.visibility = visibility }
+        )
     }
 
     /**

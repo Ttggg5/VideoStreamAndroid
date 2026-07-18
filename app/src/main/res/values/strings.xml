@@ -77,4 +77,7 @@
     <string name="settings_port_hint">Port (1024–65535)</string>
     <string name="settings_port_helper">Used the next time you start streaming, and as the default port when connecting to a host without one in the address.</string>
     <string name="settings_keep_screen_on">Keep screen on while watching</string>
+    <string name="settings_skip_seconds">Skip interval</string>
+    <string name="settings_skip_seconds_hint">Seconds (1–300)</string>
+    <string name="settings_skip_seconds_helper">How far the skip-back and skip-forward buttons jump, in the player and in remote control.</string>
 </resources>

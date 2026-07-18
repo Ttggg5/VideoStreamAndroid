@@ -43,9 +43,13 @@ class MediaHttpServerTest {
         entries: List<VideoEntry>,
         isFolderMode: Boolean,
         libraryName: String = "Library",
-        defaultSort: String = "name"
+        defaultSort: String = "name",
+        skipSeconds: Int = 10
     ): MediaHttpServer {
-        val httpServer = MediaHttpServer(0, contentResolver, assetManager, entries, libraryName, isFolderMode, defaultSort)
+        val httpServer = MediaHttpServer(
+            0, contentResolver, assetManager, entries, libraryName, isFolderMode, defaultSort,
+            skipSeconds = skipSeconds
+        )
         httpServer.start(5000, false)
         server = httpServer
         return httpServer
@@ -281,6 +285,31 @@ class MediaHttpServerTest {
         assertTrue(body.contains("id=\"prevButton\""))
         assertTrue(body.contains("id=\"nextButton\""))
         assertTrue(body.contains("id=\"shuffleToggle\""))
+    }
+
+    @Test
+    fun `remote control panel offers autoplay and skip controls`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true)
+        post(httpServer, "/remote/select?id=1")
+
+        val (_, body) = get(httpServer, "/remote")
+
+        assertTrue(body.contains("id=\"autoplayToggle\""))
+        assertTrue(body.contains("id=\"skipBackButton\""))
+        assertTrue(body.contains("id=\"skipForwardButton\""))
+    }
+
+    @Test
+    fun `remote skip controls use the host's configured skip interval`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true, skipSeconds = 30)
+        post(httpServer, "/remote/select?id=1")
+
+        val (_, body) = get(httpServer, "/remote")
+
+        assertTrue("the JS should skip by the configured interval", body.contains("var skipSeconds = 30;"))
+        assertTrue("the button should show the configured interval", body.contains("Skip forward 30 seconds"))
     }
 
     @Test

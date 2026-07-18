@@ -62,11 +62,15 @@ with a built-in screen to open another device's stream.
   other browser on the LAN) lets one device drive playback for everyone
   else, like an actual TV remote. `/remote` is a **control panel, not a
   viewing screen**: a "Now playing" card (thumbnail + title) and transport
-  controls (Previous/Next, a plain play/pause button, a range-input scrub
-  bar, and a **Random** toggle — no embedded video player UI of its own)
+  controls (Previous/Next, skip-back/skip-forward-by-N-seconds, a plain
+  play/pause button, a range-input scrub bar, and **Autoplay** and
+  **Random** toggles — no embedded video player UI of its own)
   float in a fixed panel docked to the bottom of the page, staying
   reachable while the folder browser above it is scrolled to pick
-  something else. The controls drive whatever's currently picked but never
+  something else. With **Autoplay** on, reaching the end of a video
+  advances everyone to the next one (or, with **Random** on, a random
+  one); the skip buttons jump by the **Skip interval** set in Settings
+  (which also drives the native player's rewind/fast-forward buttons). The controls drive whatever's currently picked but never
   show the video picture itself, and stay muted — the video decodes in the
   background just enough to drive a real seek bar/duration, since this
   device is controlling the stream, not watching it. Previous/Next step

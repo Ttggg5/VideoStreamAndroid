@@ -52,10 +52,16 @@ class SettingsActivity : BaseActivity() {
         binding.keepScreenOnSwitch.setOnCheckedChangeListener { _, isChecked ->
             AppSettings.setKeepScreenOnWhileWatching(this, isChecked)
         }
+
+        binding.skipSecondsInput.setText(AppSettings.getSkipSeconds(this).toString())
+        binding.skipSecondsInput.setOnFocusChangeListener { _, hasFocus ->
+            if (!hasFocus) commitSkipSeconds()
+        }
     }
 
     override fun onPause() {
         commitPort()
+        commitSkipSeconds()
         super.onPause()
     }
 
@@ -67,6 +73,17 @@ class SettingsActivity : BaseActivity() {
         val saved = AppSettings.getHttpPort(this)
         if (saved.toString() != text) {
             binding.portInput.setText(saved.toString())
+        }
+    }
+
+    /** Clamps/saves whatever's in the skip-interval field; called on blur and when leaving. */
+    private fun commitSkipSeconds() {
+        val text = binding.skipSecondsInput.text?.toString().orEmpty()
+        val typed = text.toIntOrNull() ?: return
+        AppSettings.setSkipSeconds(this, typed)
+        val saved = AppSettings.getSkipSeconds(this)
+        if (saved.toString() != text) {
+            binding.skipSecondsInput.setText(saved.toString())
         }
     }
 

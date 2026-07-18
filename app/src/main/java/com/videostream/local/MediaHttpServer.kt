@@ -57,7 +57,9 @@ class MediaHttpServer(
     private val defaultSortParam: String,
     /** The host's Settings > Accent color choice, as a "#RRGGBB" string; used as the `--accent`
      *  CSS variable on the browse/watch pages, so a viewer's browser matches the host app's look. */
-    private val accentColorHex: String = "#4A5FFF"
+    private val accentColorHex: String = "#4A5FFF",
+    /** The host's Settings > Skip interval, in seconds; how far `/remote`'s skip buttons jump. */
+    private val skipSeconds: Int = 10
 ) : NanoWSD(port) {
 
     // Keyed by VideoEntry.id. An empty array means extraction was already tried and failed,
@@ -127,6 +129,12 @@ class MediaHttpServer(
         "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M9 6l6 6-6 6\"/></svg>"
     private val playBadgeIconSvg =
         "<svg width=\"36\" height=\"36\" viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"10\" fill=\"rgba(0,0,0,0.55)\"/><path d=\"M10 8l6 4-6 4z\" fill=\"#fff\"/></svg>"
+    // Circular "replay"/"forward" arrows (the seconds count is overlaid as text in the button),
+    // for the /remote skip-back / skip-forward controls.
+    private val skipBackIconSvg =
+        "<svg viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z\"/></svg>"
+    private val skipForwardIconSvg =
+        "<svg viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M12 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z\"/></svg>"
     private val speakerMutedIconSvg =
         "<svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M11 5 6 9H3v6h3l5 4V5z\"/><line x1=\"23\" y1=\"9\" x2=\"17\" y2=\"15\"/><line x1=\"17\" y1=\"9\" x2=\"23\" y2=\"15\"/></svg>"
 
@@ -1171,12 +1179,15 @@ class MediaHttpServer(
                   <p class="nowPlayingLabel">Now playing on every connected viewer</p>
                   <p class="nowPlayingTitle">${escapeHtml(currentEntry.name)}</p>
                 </div>
+                <label class="toggle"><input type="checkbox" id="autoplayToggle"> Autoplay</label>
                 <label class="toggle"><input type="checkbox" id="shuffleToggle"> Random</label>
                 <button type="button" id="exitRemoteButton" class="exitButton">Exit remote mode</button>
               </div>
               <div class="transportControls">
                 <button type="button" id="prevButton" class="ctrlButton navButton" aria-label="Previous video">$chevronLeftIconSvg</button>
+                <button type="button" id="skipBackButton" class="ctrlButton skipButton navButton" aria-label="Skip back $skipSeconds seconds">$skipBackIconSvg<span class="skipNum">$skipSeconds</span></button>
                 <button type="button" id="playPauseButton" class="ctrlButton" aria-label="Play or pause">&#9654;</button>
+                <button type="button" id="skipForwardButton" class="ctrlButton skipButton navButton" aria-label="Skip forward $skipSeconds seconds">$skipForwardIconSvg<span class="skipNum">$skipSeconds</span></button>
                 <button type="button" id="nextButton" class="ctrlButton navButton" aria-label="Next video">$chevronRightIconSvg</button>
                 <span id="currentTimeLabel" class="timeLabel">0:00</span>
                 <input type="range" id="seekBar" class="seekBar" min="0" max="0" value="0" step="0.1">
@@ -1262,6 +1273,14 @@ class MediaHttpServer(
                 .ctrlButton:hover { opacity: 0.85; }
                 .ctrlButton.navButton { background: #262a36; width: 36px; height: 36px; }
                 .ctrlButton.navButton:hover { background: #333846; }
+                /* Skip buttons pair a circular replay/forward arrow with the seconds count
+                   overlaid in its hollow centre, so the exact jump size is visible on the button. */
+                .skipButton { position: relative; }
+                .skipButton svg { width: 22px; height: 22px; }
+                .skipNum {
+                  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -42%);
+                  font-size: 9px; font-weight: 700; line-height: 1; pointer-events: none;
+                }
                 .ctrlButton:disabled { opacity: 0.35; cursor: default; }
                 .ctrlButton:disabled:hover { background: #262a36; }
                 .timeLabel { flex-shrink: 0; width: 36px; font-size: 12px; color: #ccc; text-align: center; }
@@ -1337,6 +1356,8 @@ class MediaHttpServer(
                   localStorage.setItem(key, value ? '1' : '0');
                 }
                 var shuffleMode = loadPref('remoteShuffleMode', false);
+                var autoplayNext = loadPref('remoteAutoplay', true);
+                var skipSeconds = $skipSeconds;
 
                 // Every /remote/select reloads this whole page (see below), so there's no
                 // in-page state to keep a shuffle "bag" in between picks — a fresh uniformly
@@ -1414,6 +1435,14 @@ class MediaHttpServer(
                     if (applyingRemote) return;
                     fetch('/remote/command?action=pause', { method: 'POST' }).catch(function () {});
                   });
+                  // When Autoplay is on, reaching the end of a video advances everyone to the
+                  // next one in the current list (or a random one), the same as the native
+                  // player's Autoplay — off, playback just stops at the end.
+                  player.addEventListener('ended', function () {
+                    if (!autoplayNext) return;
+                    var id = nextVideoId();
+                    if (id !== null) selectVideo(id);
+                  });
 
                   playPauseButton.addEventListener('click', function () {
                     if (player.paused) player.play().catch(function () {}); else player.pause();
@@ -1465,7 +1494,36 @@ class MediaHttpServer(
                     updateNavButtonsState();
                   });
                 }
+                var autoplayToggle = document.getElementById('autoplayToggle');
+                if (autoplayToggle) {
+                  autoplayToggle.checked = autoplayNext;
+                  autoplayToggle.addEventListener('change', function () {
+                    autoplayNext = autoplayToggle.checked;
+                    savePref('remoteAutoplay', autoplayNext);
+                  });
+                }
                 updateNavButtonsState();
+
+                // Skip jumps the driver video by the host's configured interval and pushes the
+                // resulting position to every viewer, the same as dragging the scrub bar does.
+                function skipBy(delta) {
+                  if (!player) return;
+                  var target = player.currentTime + delta;
+                  if (target < 0) target = 0;
+                  if (isFinite(player.duration) && target > player.duration) target = player.duration;
+                  player.currentTime = target;
+                  seekBar.value = target;
+                  currentTimeLabel.textContent = formatTime(target);
+                  fetch('/remote/command?action=seek&position=' + target, { method: 'POST' }).catch(function () {});
+                }
+                var skipBackButton = document.getElementById('skipBackButton');
+                var skipForwardButton = document.getElementById('skipForwardButton');
+                if (skipBackButton) {
+                  skipBackButton.addEventListener('click', function () { skipBy(-skipSeconds); });
+                }
+                if (skipForwardButton) {
+                  skipForwardButton.addEventListener('click', function () { skipBy(skipSeconds); });
+                }
 
                 var exitButton = document.getElementById('exitRemoteButton');
                 if (exitButton) {

@@ -19,10 +19,15 @@ object AppSettings {
     private const val KEY_HTTP_PORT = "http_port"
     private const val KEY_KEEP_SCREEN_ON = "keep_screen_on_watching"
     private const val KEY_BATTERY_OPT_PROMPT_DISMISSED = "battery_opt_prompt_dismissed"
+    private const val KEY_SKIP_SECONDS = "skip_seconds"
 
     const val DEFAULT_HTTP_PORT = 8080
     const val MIN_HTTP_PORT = 1024
     const val MAX_HTTP_PORT = 65535
+
+    const val DEFAULT_SKIP_SECONDS = 10
+    const val MIN_SKIP_SECONDS = 1
+    const val MAX_SKIP_SECONDS = 300
 
     enum class AccentColor(val id: String, val hex: String, val themeOverlayRes: Int, val labelRes: Int) {
         INDIGO("indigo", "#4A5FFF", R.style.ThemeOverlay_Accent_Indigo, R.string.accent_indigo),
@@ -97,5 +102,14 @@ object AppSettings {
 
     fun setBatteryOptimizationPromptDismissed(context: Context, dismissed: Boolean) {
         prefs(context).edit().putBoolean(KEY_BATTERY_OPT_PROMPT_DISMISSED, dismissed).apply()
+    }
+
+    /** How many seconds the skip-back/skip-forward controls jump by (native player and /remote). */
+    fun getSkipSeconds(context: Context): Int =
+        prefs(context).getInt(KEY_SKIP_SECONDS, DEFAULT_SKIP_SECONDS)
+
+    fun setSkipSeconds(context: Context, seconds: Int) {
+        val clamped = seconds.coerceIn(MIN_SKIP_SECONDS, MAX_SKIP_SECONDS)
+        prefs(context).edit().putInt(KEY_SKIP_SECONDS, clamped).apply()
     }
 }

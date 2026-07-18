@@ -662,7 +662,14 @@ class WatchActivity : BaseActivity() {
                     /* bufferForPlaybackAfterRebufferMs= */ 1_000
                 )
                 .build()
-            player = ExoPlayer.Builder(this).setLoadControl(loadControl).build()
+            // Drives media3's built-in rewind/fast-forward buttons off the same Settings > Skip
+            // interval that /remote's skip buttons use, so "jump" means the same thing everywhere.
+            val skipMs = AppSettings.getSkipSeconds(this).toLong() * 1000
+            player = ExoPlayer.Builder(this)
+                .setLoadControl(loadControl)
+                .setSeekBackIncrementMs(skipMs)
+                .setSeekForwardIncrementMs(skipMs)
+                .build()
             player.addListener(playerListener)
             binding.playerView.player = player
             exoPlayer = player

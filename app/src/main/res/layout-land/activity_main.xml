@@ -10,10 +10,13 @@
     <ImageButton
         android:id="@+id/settingsButton"
         style="?android:attr/borderlessButtonStyle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
         android:contentDescription="@string/settings"
         android:src="@drawable/ic_settings"
+        android:padding="10dp"
+        android:scaleType="fitCenter"
         app:tint="?attr/colorPrimary"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />

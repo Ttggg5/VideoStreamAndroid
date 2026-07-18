@@ -16,17 +16,6 @@
         android:orientation="vertical"
         app:layout_constraintGuide_percent="0.55" />
 
-    <TextView
-        android:id="@+id/selectedFileText"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:textSize="16sp"
-        android:text="@string/no_video_selected"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="@id/midGuideline" />
-
     <!-- This row only has ~55% of the screen width to work with (everything left of
          midGuideline), too little for icon+text buttons at typical landscape phone widths,
          so landscape drops the labels and keeps icon-only buttons instead of risking their
@@ -35,15 +24,14 @@
         android:id="@+id/pickerButtons"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
         android:orientation="horizontal"
-        app:layout_constraintTop_toBottomOf="@id/selectedFileText"
+        app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="@id/midGuideline">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/chooseFileButton"
-            style="@style/Widget.Material3.Button.IconButton.Filled"
+            style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginEnd="8dp"
@@ -53,12 +41,12 @@
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/chooseFolderButton"
-            style="@style/Widget.Material3.Button.IconButton.Outlined"
+            style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:contentDescription="@string/choose_folder"
             app:icon="@drawable/ic_folder"
-            android:text="@string/choose_folder"/>
+            android:text="@string/choose_folder" />
 
     </LinearLayout>
 
@@ -93,17 +81,28 @@
 
     </LinearLayout>
 
+    <TextView
+        android:id="@+id/selectedFileText"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:textSize="16sp"
+        android:text="@string/no_video_selected"
+        android:layout_marginTop="5dp"
+        app:layout_constraintTop_toBottomOf="@id/selectedPreview"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="@id/midGuideline" />
+
     <LinearLayout
         android:id="@+id/sortOptionRow"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:visibility="gone"
-        app:layout_constraintTop_toBottomOf="@id/selectedPreview"
-        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="@id/midGuideline"
+        app:layout_constraintStart_toStartOf="parent"
         tools:visibility="visible">
 
         <TextView

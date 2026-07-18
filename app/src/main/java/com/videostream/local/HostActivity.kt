@@ -107,6 +107,7 @@ class HostActivity : BaseActivity() {
             if (selectedUri != null) {
                 applySelectionToUi()
                 if (!selectedIsFolder) loadThumbnailPreview(selectedUri!!)
+                else showFolderPreview()
             }
         }
     }
@@ -231,11 +232,6 @@ class HostActivity : BaseActivity() {
             binding.toggleButton.text = getString(
                 if (streaming) R.string.stop_streaming else R.string.start_streaming
             )
-            binding.toggleButton.backgroundTintList =
-                if (streaming)
-                    ContextCompat.getColorStateList(this, R.color.stop)
-                else
-                    ContextCompat.getColorStateList(this, R.color.start)
             binding.toggleButton.setIconResource(if (streaming) R.drawable.ic_stop else R.drawable.ic_play_arrow)
             binding.toggleButton.isEnabled = streaming || selectedUri != null
             binding.chooseFileButton.isEnabled = !streaming

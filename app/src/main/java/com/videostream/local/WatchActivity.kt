@@ -24,6 +24,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.addCallback
+import androidx.annotation.OptIn
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -33,6 +34,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.recyclerview.widget.GridLayoutManager
@@ -261,7 +263,22 @@ class WatchActivity : BaseActivity() {
     private fun setUpPlayerSection() {
         binding.playerBackButton.setOnClickListener { onPlayerBack() }
         setUpAutoplayButton()
+        setUpControllerVisibilityBinding()
         setUpFullscreenButton()
+    }
+
+    /**
+     * [playerTopBar] (the back button + title) isn't part of media3's own control bar, but
+     * should read as if it were — this makes it show/hide right along with the real controller,
+     * whatever the reason: tapping the video to toggle it, the controller's own auto-hide timer,
+     * or [setUpFullscreenButton] hiding it on entering fullscreen. Without this it was a
+     * separately-timed overlay that could end up visible while the real controls had already
+     * auto-hidden, or vice versa.
+     */
+    private fun setUpControllerVisibilityBinding() {
+        binding.playerView.setControllerVisibilityListener { visibility ->
+            binding.playerTopBar.visibility = visibility
+        }
     }
 
     /**
@@ -271,11 +288,12 @@ class WatchActivity : BaseActivity() {
      * fullscreen layout; playerSection already fills the whole screen either way, so rotating to
      * landscape is what actually removes the letterboxing on a normally-portrait phone) and
      * letting the existing rotation-without-recreating-the-player handling
-     * (`android:configChanges` + [onConfigurationChanged]) do the rest. [playerTopBar] (the
-     * back button + title) hides along with it, out of the way of the video, same as it already
-     * does while following a host's remote pick; media3's own control bar (with the button to
-     * exit fullscreen again) still shows/hides on tap as normal.
+     * (`android:configChanges` + [onConfigurationChanged]) do the rest. Explicitly hiding/showing
+     * the controller (rather than touching [playerTopBar] directly) is what makes it disappear
+     * together with the rest of the controls via [setUpControllerVisibilityBinding] instead of
+     * as a one-off special case.
      */
+    @OptIn(UnstableApi::class)
     private fun setUpFullscreenButton() {
         binding.playerView.setFullscreenButtonClickListener { fullScreen ->
             isFullScreen = fullScreen
@@ -284,7 +302,7 @@ class WatchActivity : BaseActivity() {
             } else {
                 ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
-            binding.playerTopBar.visibility = if (fullScreen) View.GONE else View.VISIBLE
+            if (fullScreen) binding.playerView.hideController() else binding.playerView.showController()
         }
         if (isFullScreen) {
             // A freshly re-inflated PlayerView always starts showing its "enter fullscreen" icon
@@ -655,7 +673,11 @@ class WatchActivity : BaseActivity() {
 
     private fun applyControllerVisible(visible: Boolean) {
         binding.playerView.setUseController(visible)
-        binding.playerTopBar.visibility = if (visible) View.VISIBLE else View.GONE
+        // Not "visible" on its own — reattachState() calls this with true on every rotation
+        // (including one caused by [setUpFullscreenButton] itself forcing landscape), and it
+        // shouldn't force playerTopBar back on over top of a fullscreen session that had
+        // already hidden it via [setUpControllerVisibilityBinding].
+        binding.playerTopBar.visibility = if (visible && !isFullScreen) View.VISIBLE else View.GONE
     }
 
     private fun onPlayerBack() {

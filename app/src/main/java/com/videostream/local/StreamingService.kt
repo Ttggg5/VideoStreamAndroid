@@ -13,7 +13,9 @@ import android.net.nsd.NsdServiceInfo
 import android.net.wifi.WifiManager
 import android.os.Binder
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.PowerManager
 import android.util.Log
 import android.widget.Toast
@@ -52,11 +54,18 @@ class StreamingService : Service() {
      */
     val streamSourceUri = MutableLiveData<Uri?>(null)
 
-    private var server: MediaHttpServer? = null
+    // Written from the background scan/start thread, read from stop/onDestroy on the main thread.
+    @Volatile private var server: MediaHttpServer? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
     private var nsdManager: NsdManager? = null
     private var nsdRegistrationListener: NsdManager.RegistrationListener? = null
+
+    private val mainHandler = Handler(Looper.getMainLooper())
+    // True from the moment a start is accepted until it either finishes publishing state or is
+    // torn down by a stop that arrived mid-scan. Guards against a second start racing the first,
+    // and lets the background thread know a stop beat it to the finish line. Main-thread only.
+    private var starting = false
 
     override fun onCreate() {
         super.onCreate()
@@ -75,33 +84,44 @@ class StreamingService : Service() {
     override fun onBind(intent: Intent): IBinder = binder
 
     private fun handleStart(intent: Intent) {
+        if (starting || isStreaming.value == true) return
         val name = intent.getStringExtra(EXTRA_VIDEO_NAME) ?: "video"
         val fileUriString = intent.getStringExtra(EXTRA_VIDEO_URI)
         val folderUriString = intent.getStringExtra(EXTRA_FOLDER_URI)
-        when {
-            fileUriString != null -> {
+        val defaultSort = intent.getStringExtra(EXTRA_DEFAULT_SORT) ?: DEFAULT_SORT_PARAM
+        if (fileUriString == null && folderUriString == null) return
+
+        // Enter the foreground immediately. startForegroundService() requires startForeground()
+        // within ~5s; the folder scan below is a SAF ContentResolver query per file and is now
+        // unbounded, so it can easily outlast that deadline and must not run before this point.
+        starting = true
+        acquireWakeLock()
+        acquireWifiLock()
+        startInForeground(getString(R.string.notification_starting))
+
+        // Scan + HTTP server startup run off the main thread so a large folder can't ANR the app
+        // (or blow the foreground-start deadline). The lightweight "publish state" step is posted
+        // back to the main thread in startStreaming().
+        Thread {
+            if (fileUriString != null) {
                 val fileUri = Uri.parse(fileUriString)
                 val entry = VideoEntry(0, name, folderPath = "", uri = fileUri)
-                startStreaming(
-                    entries = listOf(entry),
-                    libraryLabel = name,
-                    isFolderMode = false,
-                    defaultSort = DEFAULT_SORT_PARAM,
-                    sourceUri = fileUri
-                )
-            }
-            folderUriString != null -> {
-                val folderUri = Uri.parse(folderUriString)
+                startStreaming(listOf(entry), name, isFolderMode = false, defaultSort = DEFAULT_SORT_PARAM, sourceUri = fileUri)
+            } else {
+                val folderUri = Uri.parse(folderUriString!!)
                 val entries = scanFolderForVideos(folderUri)
                 val label = getString(R.string.library_summary, name, entries.size)
-                startStreaming(
-                    entries = entries,
-                    libraryLabel = label,
-                    isFolderMode = true,
-                    defaultSort = intent.getStringExtra(EXTRA_DEFAULT_SORT) ?: DEFAULT_SORT_PARAM,
-                    sourceUri = folderUri
-                )
+                startStreaming(entries, label, isFolderMode = true, defaultSort = defaultSort, sourceUri = folderUri)
             }
+        }.start()
+    }
+
+    private fun startInForeground(contentText: String) {
+        val notification = buildNotification(contentText)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
         }
     }
 
@@ -112,11 +132,13 @@ class StreamingService : Service() {
         return results
     }
 
-    /** [folderPath] is this directory's path relative to the chosen root ("" for the root itself). */
+    /** [folderPath] is this directory's path relative to the chosen root ("" for the root itself).
+     *  There's no cap on the number of videos collected — a hosted folder includes every video in
+     *  it. [depth] is bounded only as a guard against pathologically deep trees blowing the stack,
+     *  not as a feature limit; realistic libraries never approach it. */
     private fun scanDir(dir: DocumentFile, folderPath: String, results: MutableList<VideoEntry>, depth: Int) {
-        if (results.size >= MAX_LIBRARY_ENTRIES || depth > MAX_SCAN_DEPTH) return
+        if (depth > MAX_SCAN_DEPTH) return
         for (child in dir.listFiles()) {
-            if (results.size >= MAX_LIBRARY_ENTRIES) break
             val childName = child.name ?: continue
             if (child.isDirectory) {
                 val childPath = if (folderPath.isEmpty()) childName else "$folderPath/$childName"
@@ -143,6 +165,8 @@ class StreamingService : Service() {
         return VIDEO_EXTENSIONS.any { name.endsWith(it, ignoreCase = true) }
     }
 
+    /** Runs on the background thread started by [handleStart] — the foreground service is already
+     *  up by now, so this only builds/starts the server and then publishes state on the main thread. */
     private fun startStreaming(
         entries: List<VideoEntry>,
         libraryLabel: String,
@@ -150,25 +174,11 @@ class StreamingService : Service() {
         defaultSort: String,
         sourceUri: Uri
     ) {
-        if (isStreaming.value == true) return
-
-        // startForeground() must be called promptly whenever the service was launched via
-        // startForegroundService() (as HostActivity always does), or Android kills the app with
-        // ForegroundServiceDidNotStartInTimeException — so this runs before the entries.isEmpty()
-        // check below, and that error path tears back down through stopStreaming() instead of
-        // returning early.
-        acquireWakeLock()
-        acquireWifiLock()
-        val notification = buildNotification(getString(R.string.notification_starting))
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
-        }
-
         if (entries.isEmpty()) {
-            Toast.makeText(this, getString(R.string.error_no_videos_found), Toast.LENGTH_LONG).show()
-            stopStreaming()
+            mainHandler.post {
+                Toast.makeText(this, getString(R.string.error_no_videos_found), Toast.LENGTH_LONG).show()
+                stopStreaming()
+            }
             return
         }
 
@@ -180,32 +190,45 @@ class StreamingService : Service() {
         )
         try {
             httpServer.start(NANOHTTPD_TIMEOUT_MS, false)
-            server = httpServer
         } catch (e: Exception) {
             Log.e(TAG, "Failed to start HTTP server", e)
-            stopStreaming()
+            mainHandler.post { stopStreaming() }
             return
         }
+        // Assigned before the main-thread hop so a concurrent stopStreaming()/onDestroy() can
+        // always find and shut down the just-started server.
+        server = httpServer
 
-        videoName.postValue(libraryLabel)
-        isFolderStream.postValue(isFolderMode)
-        streamSourceUri.postValue(sourceUri)
-        val ip = NetworkUtils.getLocalIpAddress()
-        val url = if (ip != null) "http://$ip:$port" else null
-        serverUrl.postValue(url)
-        isStreaming.postValue(true)
-        updateNotification(
-            if (url != null) getString(R.string.notification_streaming, url)
-            else getString(R.string.notification_no_network)
-        )
-
-        // Lets WatchActivity find this host automatically instead of requiring a typed-in
-        // address; if registration fails for any reason (e.g. mDNS blocked on this network),
-        // the URL above still works for manual connect.
-        registerNsdService(libraryLabel, port)
+        mainHandler.post {
+            if (!starting) {
+                // A stop arrived while we were scanning/starting — tear the just-started server
+                // back down instead of publishing a stream nobody asked to keep.
+                httpServer.stop()
+                if (server === httpServer) server = null
+                return@post
+            }
+            videoName.value = libraryLabel
+            isFolderStream.value = isFolderMode
+            streamSourceUri.value = sourceUri
+            val ip = NetworkUtils.getLocalIpAddress()
+            val url = if (ip != null) "http://$ip:$port" else null
+            serverUrl.value = url
+            isStreaming.value = true
+            updateNotification(
+                if (url != null) getString(R.string.notification_streaming, url)
+                else getString(R.string.notification_no_network)
+            )
+            // Lets WatchActivity find this host automatically instead of requiring a typed-in
+            // address; if registration fails for any reason (e.g. mDNS blocked on this network),
+            // the URL above still works for manual connect.
+            registerNsdService(libraryLabel, port)
+            starting = false
+        }
     }
 
     private fun stopStreaming() {
+        // Signals an in-flight background start (if any) to abandon itself rather than publish.
+        starting = false
         unregisterNsdService()
 
         server?.stop()
@@ -358,8 +381,9 @@ class StreamingService : Service() {
         private const val NOTIFICATION_ID = 1
         private const val WAKE_LOCK_TIMEOUT_MS = 12 * 60 * 60 * 1000L // 12h safety cap
         private const val NANOHTTPD_TIMEOUT_MS = 5000
-        private const val MAX_LIBRARY_ENTRIES = 500
-        private const val MAX_SCAN_DEPTH = 6
+        // Recursion-depth guard only (see scanDir) — deep enough that no real folder tree hits it,
+        // just a backstop against a pathologically deep tree overflowing the stack.
+        private const val MAX_SCAN_DEPTH = 100
         private val VIDEO_EXTENSIONS = listOf(
             ".mp4", ".mkv", ".webm", ".avi", ".mov", ".m4v", ".3gp", ".ts", ".flv", ".wmv", ".mpg", ".mpeg"
         )

@@ -177,8 +177,8 @@ VLC can also open the `http://<ip>:<port>/video` URL directly.
 
 1. Tap **Host a Video**.
 2. Tap **Choose Video File** for a single video, or **Choose Folder** to
-   pick a whole folder — the app scans it (including subfolders, up to
-   500 videos) for playable files.
+   pick a whole folder — the app scans it (including subfolders) for
+   every playable file, with no cap on how many.
    A thumbnail preview appears once a single file is picked (folders
    don't get one, since there's no single representative frame).
    Picking a folder also reveals **Default sort** (Name / Newest /
@@ -386,8 +386,10 @@ plug in `r0adkll/upload-google-play` (or similar) once those secrets exist.
 - No authentication — anyone on the same LAN can open the stream URL,
   including `/remote`: any device that can reach it can change what
   plays on every other connected viewer.
-- Folder scanning is capped at 500 videos and 6 levels deep, to keep
-  startup fast on very large folders.
+- A hosted folder includes every video in it, however many — there's no
+  cap on the count. The scan runs off the main thread (so a large library
+  doesn't freeze the app while it's read) and only bounds folder-nesting
+  depth as a stack-overflow backstop, not as a feature limit.
 - Some cloud-backed "virtual" documents (e.g. certain Google Drive/Photos
   entries) don't expose a normal file descriptor and won't be servable;
   pick a file that's actually stored on the device.

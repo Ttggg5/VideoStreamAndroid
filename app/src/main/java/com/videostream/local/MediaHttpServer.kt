@@ -272,7 +272,7 @@ class MediaHttpServer(
         val sortMode = SortMode.fromParam(session.parameters["sort"]?.firstOrNull() ?: defaultSortParam)
         val flat = session.parameters["flat"]?.firstOrNull() == "1"
         // /remote's control panel drives this viewer entirely — no local controls of its own.
-        val remote = isFolderMode && session.parameters["remote"]?.firstOrNull() == "1"
+        val remote = session.parameters["remote"]?.firstOrNull() == "1"
         return watchPage(entry, sortMode, flat, remote)
     }
 
@@ -660,12 +660,11 @@ class MediaHttpServer(
         } else {
             ""
         }
-        // Only meaningful in folder mode — a single streamed file has nothing else to switch to,
-        // and there'd be no /remote page for it to follow anyway. Unlike the in-place playlist
-        // switching above, a remote pick hands off entirely to the bare, control-less player —
-        // this page's own controls/playlist stop being relevant the moment /remote is used.
-        val remoteFollowScript = if (isFolderMode) {
-            """
+        // A remote pick hands off entirely to the bare, control-less player — this page's own
+        // controls/playlist stop being relevant the moment /remote is used. This applies in
+        // single-file mode too: /remote can now drive a lone video's playback for everyone, so a
+        // single-file viewer has to follow along the same way a folder viewer does.
+        val remoteFollowScript = """
                 (function connectRemoteFollow() {
                   function applyState(state) {
                     if (state.videoId !== null) {
@@ -684,9 +683,6 @@ class MediaHttpServer(
                   connect();
                 })();
             """.trimIndent()
-        } else {
-            ""
-        }
 
         val html = """
             <!DOCTYPE html>
@@ -1111,24 +1107,37 @@ class MediaHttpServer(
     }
 
     /**
-     * The control panel: a player with full transport controls (play/pause/seek/volume/
-     * fullscreen) for the currently selected video, plus a folder-navigation UI below it to pick
-     * a different one. This is the page a "remote control" device (the host app's own screen, or
-     * any other browser on the LAN) loads — every other connected viewer's [watchPage] is a
-     * control-less display that just follows what happens here, polling `/remote/state`. Only
-     * meaningful in folder mode; a single streamed file has nothing to pick.
+     * The control panel: a player with full transport controls (play/pause/seek/skip) for the
+     * currently selected video, plus — in folder mode — a folder-navigation UI below it to pick a
+     * different one. This is the page a "remote control" device (the host app's own screen, or any
+     * other browser on the LAN) loads — every other connected viewer's [watchPage] is a
+     * control-less display that just follows what happens here. In single-file mode there's
+     * nothing to pick between, so the browser/grid and the Prev/Next/Random/Autoplay controls are
+     * dropped, but driving one video's play/pause/seek for everyone still works.
      */
     private fun remotePage(path: String, sortMode: SortMode): Response {
-        if (!isFolderMode) {
-            return newFixedLengthResponse(
-                Response.Status.NOT_FOUND, "text/plain", "Remote control needs a hosted folder"
-            )
-        }
-        val listing = computeListing(path, flat = false, sortMode)
-            ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Folder not found")
-        val (effectivePath, title, videos, subfolders) = listing
         val current = remoteSelection.get()
         val currentEntry = current.videoId?.let { id -> entries.firstOrNull { it.id == id } }
+
+        val effectivePath: String
+        val title: String
+        val videos: List<VideoEntry>
+        val subfolders: List<String>
+        if (isFolderMode) {
+            val listing = computeListing(path, flat = false, sortMode)
+                ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Folder not found")
+            effectivePath = listing.effectivePath
+            title = listing.title
+            videos = listing.videos
+            subfolders = listing.subfolders
+        } else {
+            val single = entries.singleOrNull()
+                ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "No video available")
+            effectivePath = ""
+            title = single.name
+            videos = listOf(single)
+            subfolders = emptyList()
+        }
 
         val backLink = if (effectivePath.isNotEmpty()) {
             val parentPath = effectivePath.substringBeforeLast('/', "")
@@ -1140,7 +1149,9 @@ class MediaHttpServer(
             val childPath = if (effectivePath.isEmpty()) folderName else "$effectivePath/$folderName"
             "<li><a href=\"/remote?path=${encodePath(childPath)}&sort=${sortMode.param}\">$folderIconSvg ${escapeHtml(folderName)}</a></li>"
         }
-        val videoItems = videos.joinToString("\n") { entry ->
+        // Single-file mode has no grid to pick from — the one video is taken control of via the
+        // placeholder's "Take control" button instead.
+        val videoItems = if (!isFolderMode) "" else videos.joinToString("\n") { entry ->
             val selectedClass = if (entry.id == current.videoId) " selected" else ""
             """
             <li>
@@ -1170,6 +1181,26 @@ class MediaHttpServer(
         // folder/sort order — the same set the grid itself shows, so the buttons always match
         // what's visually on screen.
         val videoIdsJson = videos.joinToString(",") { it.id.toString() }
+        // Prev/Next/Random/Autoplay only make sense when there's more than one video to move
+        // between, i.e. folder mode; single-file keeps just play/pause, skip, and seek.
+        val panelToggles = if (isFolderMode) {
+            """
+                <label class="toggle"><input type="checkbox" id="autoplayToggle"> Autoplay</label>
+                <label class="toggle"><input type="checkbox" id="shuffleToggle"> Random</label>
+            """.trimIndent()
+        } else {
+            ""
+        }
+        val prevButtonHtml = if (isFolderMode) {
+            """<button type="button" id="prevButton" class="ctrlButton navButton" aria-label="Previous video">$chevronLeftIconSvg</button>"""
+        } else {
+            ""
+        }
+        val nextButtonHtml = if (isFolderMode) {
+            """<button type="button" id="nextButton" class="ctrlButton navButton" aria-label="Next video">$chevronRightIconSvg</button>"""
+        } else {
+            ""
+        }
         val playerSection = if (currentEntry != null) {
             """
             <div class="controlPanel">
@@ -1179,16 +1210,15 @@ class MediaHttpServer(
                   <p class="nowPlayingLabel">Now playing on every connected viewer</p>
                   <p class="nowPlayingTitle">${escapeHtml(currentEntry.name)}</p>
                 </div>
-                <label class="toggle"><input type="checkbox" id="autoplayToggle"> Autoplay</label>
-                <label class="toggle"><input type="checkbox" id="shuffleToggle"> Random</label>
+                $panelToggles
                 <button type="button" id="exitRemoteButton" class="exitButton">Exit remote mode</button>
               </div>
               <div class="transportControls">
-                <button type="button" id="prevButton" class="ctrlButton navButton" aria-label="Previous video">$chevronLeftIconSvg</button>
+                $prevButtonHtml
                 <button type="button" id="skipBackButton" class="ctrlButton skipButton navButton" aria-label="Skip back $skipSeconds seconds">$skipBackIconSvg<span class="skipNum">$skipSeconds</span></button>
                 <button type="button" id="playPauseButton" class="ctrlButton" aria-label="Play or pause">&#9654;</button>
                 <button type="button" id="skipForwardButton" class="ctrlButton skipButton navButton" aria-label="Skip forward $skipSeconds seconds">$skipForwardIconSvg<span class="skipNum">$skipSeconds</span></button>
-                <button type="button" id="nextButton" class="ctrlButton navButton" aria-label="Next video">$chevronRightIconSvg</button>
+                $nextButtonHtml
                 <span id="currentTimeLabel" class="timeLabel">0:00</span>
                 <input type="range" id="seekBar" class="seekBar" min="0" max="0" value="0" step="0.1">
                 <span id="durationLabel" class="timeLabel">0:00</span>
@@ -1198,8 +1228,18 @@ class MediaHttpServer(
               </video>
             </div>
             """.trimIndent()
-        } else {
+        } else if (isFolderMode) {
             """<p class="placeholder">Pick a video below to start controlling playback on every connected viewer.</p>"""
+        } else {
+            // Single-file mode: nothing to pick, so one button hands this video's playback off to
+            // every connected viewer and reveals the control panel.
+            val singleId = videos.first().id
+            """
+            <div class="placeholder">
+              <p style="margin: 0 0 16px;">Take over playback of this video on every connected viewer.</p>
+              <button type="button" id="takeControlButton" class="ctrlButton" data-id="$singleId" style="width: auto; padding: 10px 20px; border-radius: 999px;">Take control</button>
+            </div>
+            """.trimIndent()
         }
 
         val html = """
@@ -1325,7 +1365,7 @@ class MediaHttpServer(
             </head>
             <body${if (currentEntry != null) " class=\"hasControlPanel\"" else ""}>
               <h1>${escapeHtml(title)}</h1>
-              <p class="subtitle">Every connected viewer sees exactly what plays here — pick a video, then use the player controls to drive playback for everyone.</p>
+              <p class="subtitle">${if (isFolderMode) "Every connected viewer sees exactly what plays here — pick a video, then use the player controls to drive playback for everyone." else "Every connected viewer sees exactly what plays here — use the player controls to drive playback for everyone."}</p>
               $playerSection
               <ul class="folders">
                 $backLink
@@ -1464,6 +1504,14 @@ class MediaHttpServer(
                 for (var i = 0; i < cards.length; i++) {
                   cards[i].addEventListener('click', function () {
                     selectVideo(parseInt(this.getAttribute('data-id'), 10));
+                  });
+                }
+
+                // Single-file mode's one-button hand-off (there's no grid of cards to pick from).
+                var takeControlButton = document.getElementById('takeControlButton');
+                if (takeControlButton) {
+                  takeControlButton.addEventListener('click', function () {
+                    selectVideo(parseInt(takeControlButton.getAttribute('data-id'), 10));
                   });
                 }
 

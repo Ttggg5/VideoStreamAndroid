@@ -56,15 +56,19 @@ with a built-in screen to open another device's stream.
   app's own **Watch a Stream** screen doesn't use this page at all; see
   below.
 - **Remote control mode**: normally each viewer browses and picks for
-  themselves, but for a folder stream there's a second way to pick a
-  video — `/remote` (opened via a **Remote Control** button on the Host
-  screen once a folder is streaming, or by loading `/remote` from any
-  other browser on the LAN) lets one device drive playback for everyone
-  else, like an actual TV remote. `/remote` is a **control panel, not a
-  viewing screen**: a "Now playing" card (thumbnail + title) and transport
-  controls (Previous/Next, skip-back/skip-forward-by-N-seconds, a plain
-  play/pause button, a range-input scrub bar, and **Autoplay** and
-  **Random** toggles — no embedded video player UI of its own)
+  themselves, but `/remote` (opened via a **Remote Control** button on the
+  Host screen whenever a stream is running, or by loading `/remote` from
+  any other browser on the LAN) lets one device drive playback for
+  everyone else, like an actual TV remote. It works for a **single-file
+  stream** too — there's nothing to pick between, so one **Take control**
+  button hands that video's playback to every viewer, and the panel then
+  shows just play/pause, seek, and skip (no Prev/Next/Random/Autoplay).
+  For a folder stream you also get a video picker. `/remote` is a
+  **control panel, not a viewing screen**: a "Now playing" card
+  (thumbnail + title) and transport controls (Previous/Next,
+  skip-back/skip-forward-by-N-seconds, a plain play/pause button, a
+  range-input scrub bar, and **Autoplay** and **Random** toggles — no
+  embedded video player UI of its own)
   float in a fixed panel docked to the bottom of the page, staying
   reachable while the folder browser above it is scrolled to pick
   something else. With **Autoplay** on, reaching the end of a video

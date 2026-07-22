@@ -215,12 +215,11 @@ class HostActivity : BaseActivity() {
         return null
     }
 
-    /** Only folder mode has more than one video for a remote to choose between. */
+    /** Available for any active stream — a folder (pick + drive playback for everyone) or a
+     *  single file (drive that one video's play/pause/seek for everyone). */
     private fun updateRemoteControlButtonVisibility() {
-        val currentService = service ?: return
-        val streaming = currentService.isStreaming.value == true
-        val isFolder = currentService.isFolderStream.value == true
-        binding.remoteControlButton.visibility = if (streaming && isFolder) View.VISIBLE else View.GONE
+        val streaming = service?.isStreaming?.value == true
+        binding.remoteControlButton.visibility = if (streaming) View.VISIBLE else View.GONE
     }
 
     private fun attachObservers() {

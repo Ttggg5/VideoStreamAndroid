@@ -229,13 +229,34 @@ class MediaHttpServerTest {
     }
 
     @Test
-    fun `remote is unavailable in single file mode`() {
+    fun `remote control is available in single file mode with a take-control button`() {
         val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
         val httpServer = startServer(entries, isFolderMode = false)
 
-        val (code, _) = get(httpServer, "/remote")
+        val (code, body) = get(httpServer, "/remote")
 
-        assertEquals(404, code)
+        assertEquals(200, code)
+        // Before taking control, a single-file remote offers one button to hand off playback,
+        // with no folder grid to pick from.
+        assertTrue(body.contains("id=\"takeControlButton\""))
+        assertFalse("single-file remote has no video grid to pick from", body.contains("class=\"videoCard"))
+    }
+
+    @Test
+    fun `single file remote drops next-previous and random once controlling`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = false)
+        post(httpServer, "/remote/select?id=1")
+
+        val (_, body) = get(httpServer, "/remote")
+
+        // Play/pause, seek and skip still drive the one video for everyone...
+        assertTrue(body.contains("id=\"playPauseButton\""))
+        assertTrue(body.contains("id=\"skipForwardButton\""))
+        // ...but there's nothing to move between, so no Prev/Next/Random.
+        assertFalse(body.contains("id=\"prevButton\""))
+        assertFalse(body.contains("id=\"nextButton\""))
+        assertFalse(body.contains("id=\"shuffleToggle\""))
     }
 
     @Test

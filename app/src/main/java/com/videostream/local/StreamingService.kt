@@ -17,10 +17,10 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.provider.DocumentsContract
 import android.util.Log
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
-import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.MutableLiveData
 
 /**
@@ -126,42 +126,88 @@ class StreamingService : Service() {
     }
 
     private fun scanFolderForVideos(treeUri: Uri): List<VideoEntry> {
-        val root = DocumentFile.fromTreeUri(this, treeUri) ?: return emptyList()
+        val rootDocId = try {
+            DocumentsContract.getTreeDocumentId(treeUri)
+        } catch (e: Exception) {
+            return emptyList()
+        }
         val results = mutableListOf<VideoEntry>()
-        scanDir(root, "", results, 0)
+        scanDir(treeUri, rootDocId, "", results, 0)
         return results
     }
 
-    /** [folderPath] is this directory's path relative to the chosen root ("" for the root itself).
-     *  There's no cap on the number of videos collected — a hosted folder includes every video in
-     *  it. [depth] is bounded only as a guard against pathologically deep trees blowing the stack,
-     *  not as a feature limit; realistic libraries never approach it. */
-    private fun scanDir(dir: DocumentFile, folderPath: String, results: MutableList<VideoEntry>, depth: Int) {
+    /**
+     * Lists one directory with a single [ContentResolver.query] that pulls every child and all the
+     * columns needed at once, instead of walking [androidx.documentfile.provider.DocumentFile],
+     * whose per-child name/type/size/date getters each fire their own SAF query — roughly one
+     * query per directory here versus several per file, which is what made large folders take so
+     * long to load.
+     *
+     * [folderPath] is this directory's path relative to the chosen root ("" for the root itself).
+     * There's no cap on the number of videos collected — a hosted folder includes every video in
+     * it. [depth] is bounded only as a guard against pathologically deep trees blowing the stack,
+     * not as a feature limit; realistic libraries never approach it.
+     */
+    private fun scanDir(
+        treeUri: Uri,
+        parentDocId: String,
+        folderPath: String,
+        results: MutableList<VideoEntry>,
+        depth: Int
+    ) {
         if (depth > MAX_SCAN_DEPTH) return
-        for (child in dir.listFiles()) {
-            val childName = child.name ?: continue
-            if (child.isDirectory) {
-                val childPath = if (folderPath.isEmpty()) childName else "$folderPath/$childName"
-                scanDir(child, childPath, results, depth + 1)
-            } else if (isVideoFile(child)) {
-                results.add(
-                    VideoEntry(
-                        id = results.size,
-                        name = childName,
-                        folderPath = folderPath,
-                        uri = child.uri,
-                        lastModified = child.lastModified(),
-                        sizeBytes = child.length()
-                    )
-                )
+        val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(treeUri, parentDocId)
+        val projection = arrayOf(
+            DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+            DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+            DocumentsContract.Document.COLUMN_MIME_TYPE,
+            DocumentsContract.Document.COLUMN_LAST_MODIFIED,
+            DocumentsContract.Document.COLUMN_SIZE
+        )
+        // Subdirectories are recursed into after this directory's cursor is closed, rather than
+        // while it's still open, so the scan never holds a stack of provider cursors open at once.
+        val subDirs = mutableListOf<Pair<String, String>>()
+        try {
+            contentResolver.query(childrenUri, projection, null, null, null)?.use { cursor ->
+                val idCol = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                val nameCol = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                val mimeCol = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE)
+                // Optional — some providers omit these; a missing column must not drop the file,
+                // just leave its date/size unknown (used only for the Newest/Largest sort orders).
+                val modCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_LAST_MODIFIED)
+                val sizeCol = cursor.getColumnIndex(DocumentsContract.Document.COLUMN_SIZE)
+                while (cursor.moveToNext()) {
+                    val docId = cursor.getString(idCol) ?: continue
+                    val name = cursor.getString(nameCol) ?: continue
+                    val mime = cursor.getString(mimeCol)
+                    if (mime == DocumentsContract.Document.MIME_TYPE_DIR) {
+                        val childPath = if (folderPath.isEmpty()) name else "$folderPath/$name"
+                        subDirs.add(docId to childPath)
+                    } else if (isVideoFile(name, mime)) {
+                        results.add(
+                            VideoEntry(
+                                id = results.size,
+                                name = name,
+                                folderPath = folderPath,
+                                uri = DocumentsContract.buildDocumentUriUsingTree(treeUri, docId),
+                                lastModified = if (modCol < 0 || cursor.isNull(modCol)) 0L else cursor.getLong(modCol),
+                                sizeBytes = if (sizeCol < 0 || cursor.isNull(sizeCol)) 0L else cursor.getLong(sizeCol)
+                            )
+                        )
+                    }
+                }
             }
+        } catch (e: Exception) {
+            // A provider that fails on one directory shouldn't sink the whole scan — skip it.
+            Log.w(TAG, "Failed to list $folderPath", e)
+        }
+        for ((docId, childPath) in subDirs) {
+            scanDir(treeUri, docId, childPath, results, depth + 1)
         }
     }
 
-    private fun isVideoFile(file: DocumentFile): Boolean {
-        val type = file.type
-        if (type != null && type.startsWith("video/")) return true
-        val name = file.name ?: return false
+    private fun isVideoFile(name: String, mimeType: String?): Boolean {
+        if (mimeType != null && mimeType.startsWith("video/")) return true
         return VIDEO_EXTENSIONS.any { name.endsWith(it, ignoreCase = true) }
     }
 

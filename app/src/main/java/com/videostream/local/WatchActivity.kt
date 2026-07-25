@@ -30,6 +30,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.updateLayoutParams
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
@@ -670,6 +671,12 @@ class WatchActivity : BaseActivity() {
                 .setSeekBackIncrementMs(skipMs)
                 .setSeekForwardIncrementMs(skipMs)
                 .build()
+            // Holds a partial wake lock AND a Wi-Fi lock while playing. Without this, the device's
+            // Wi-Fi radio can power-save mid-stream (especially on Android TV, and during the gaps
+            // when the buffer above is full and nothing's being fetched), stalling the connection
+            // to the host until a stuck radio recovers — which is why playback could drop after a
+            // few minutes and not come back even on an app restart. Uses the WAKE_LOCK permission.
+            player.setWakeMode(C.WAKE_MODE_NETWORK)
             player.addListener(playerListener)
             binding.playerView.player = player
             exoPlayer = player

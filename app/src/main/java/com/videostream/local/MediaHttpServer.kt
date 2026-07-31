@@ -124,11 +124,13 @@ class MediaHttpServer(
     private val folderIconSvg =
         "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z\"/></svg>"
     private val chevronLeftIconSvg =
-        "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M15 6l-6 6 6 6\"/></svg>"
+        "<svg width=\"20\" height=\"20\" fill=\"currentColor\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 640 640\"><path d=\"M491 100.8C478.1 93.8 462.3 94.5 450 102.6L192 272.1L192 128C192 110.3 177.7 96 160 96C142.3 96 128 110.3 128 128L128 512C128 529.7 142.3 544 160 544C177.7 544 192 529.7 192 512L192 367.9L450 537.5C462.3 545.6 478 546.3 491 539.3C504 532.3 512 518.8 512 504.1L512 136.1C512 121.4 503.9 107.9 491 100.9z\"/></svg>"
     private val chevronRightIconSvg =
-        "<svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M9 6l6 6-6 6\"/></svg>"
+        "<svg width=\"20\" height=\"20\" fill=\"currentColor\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 640 640\"><path d=\"M149 100.8C161.9 93.8 177.7 94.5 190 102.6L448 272.1L448 128C448 110.3 462.3 96 480 96C497.7 96 512 110.3 512 128L512 512C512 529.7 497.7 544 480 544C462.3 544 448 529.7 448 512L448 367.9L190 537.5C177.7 545.6 162 546.3 149 539.3C136 532.3 128 518.7 128 504L128 136C128 121.3 136.1 107.8 149 100.8z\"/></svg>"
     private val playBadgeIconSvg =
         "<svg width=\"36\" height=\"36\" viewBox=\"0 0 24 24\"><circle cx=\"12\" cy=\"12\" r=\"10\" fill=\"rgba(0,0,0,0.55)\"/><path d=\"M10 8l6 4-6 4z\" fill=\"#fff\"/></svg>"
+    private val playIconSvg =
+        "<svg width=\"45\" height=\"45\" fill=\"currentColor\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 640 640\"><path d=\"M187.2 100.9C174.8 94.1 159.8 94.4 147.6 101.6C135.4 108.8 128 121.9 128 136L128 504C128 518.1 135.5 531.2 147.6 538.4C159.7 545.6 174.8 545.9 187.2 539.1L523.2 355.1C536 348.1 544 334.6 544 320C544 305.4 536 291.9 523.2 284.9L187.2 100.9z\"/></svg>"
     // Circular "replay"/"forward" arrows (the seconds count is overlaid as text in the button),
     // for the /remote skip-back / skip-forward controls.
     private val skipBackIconSvg =
@@ -137,6 +139,12 @@ class MediaHttpServer(
         "<svg viewBox=\"0 0 24 24\" fill=\"currentColor\"><path d=\"M12 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z\"/></svg>"
     private val speakerMutedIconSvg =
         "<svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M11 5 6 9H3v6h3l5 4V5z\"/><line x1=\"23\" y1=\"9\" x2=\"17\" y2=\"15\"/><line x1=\"17\" y1=\"9\" x2=\"23\" y2=\"15\"/></svg>"
+    private val exitIconSvg =
+        "<svg width=\"24\" height=\"24\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 512 512\" class=\"ionicon\"><path d=\"M320 176v-40a40 40 0 0 0-40-40H88a40 40 0 0 0-40 40v240a40 40 0 0 0 40 40h192a40 40 0 0 0 40-40v-40M384 176l80 80-80 80M191 256h273\" fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"40px\"/></svg>"
+    private val autoPlayIconSvg =
+        "<svg width=\"20\" height=\"20\" fill=\"currentColor\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 640 640\"><path d=\"M64 320C64 178.6 178.6 64 320 64C461.4 64 576 178.6 576 320C576 461.4 461.4 576 320 576C178.6 576 64 461.4 64 320zM252.3 211.1C244.7 215.3 240 223.4 240 232L240 408C240 416.7 244.7 424.7 252.3 428.9C259.9 433.1 269.1 433 276.6 428.4L420.6 340.4C427.7 336 432.1 328.3 432.1 319.9C432.1 311.5 427.7 303.8 420.6 299.4L276.6 211.4C269.2 206.9 259.9 206.7 252.3 210.9z\"/></svg>"
+    private val randomPlayIconSvg =
+        "<svg width=\"20\" height=\"20\" fill=\"currentColor\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 640 640\"><path d=\"M467.8 98.4C479.8 93.4 493.5 96.2 502.7 105.3L566.7 169.3C572.7 175.3 576.1 183.4 576.1 191.9C576.1 200.4 572.7 208.5 566.7 214.5L502.7 278.5C493.5 287.7 479.8 290.4 467.8 285.4C455.8 280.4 448 268.9 448 256L448 224L416 224C405.9 224 396.4 228.7 390.4 236.8L358 280L318 226.7L339.2 198.4C357.3 174.2 385.8 160 416 160L448 160L448 128C448 115.1 455.8 103.4 467.8 98.4zM218 360L258 413.3L236.8 441.6C218.7 465.8 190.2 480 160 480L96 480C78.3 480 64 465.7 64 448C64 430.3 78.3 416 96 416L160 416C170.1 416 179.6 411.3 185.6 403.2L218 360zM502.6 534.6C493.4 543.8 479.7 546.5 467.7 541.5C455.7 536.5 448 524.9 448 512L448 480L416 480C385.8 480 357.3 465.8 339.2 441.6L185.6 236.8C179.6 228.7 170.1 224 160 224L96 224C78.3 224 64 209.7 64 192C64 174.3 78.3 160 96 160L160 160C190.2 160 218.7 174.2 236.8 198.4L390.4 403.2C396.4 411.3 405.9 416 416 416L448 416L448 384C448 371.1 455.8 359.4 467.8 354.4C479.8 349.4 493.5 352.2 502.7 361.3L566.7 425.3C572.7 431.3 576.1 439.4 576.1 447.9C576.1 456.4 572.7 464.5 566.7 470.5L502.7 534.5z\"/></svg>"
 
     /** Closes the underlying [ParcelFileDescriptor] together with the stream view over it. */
     private class ClosingFileInputStream(private val pfd: ParcelFileDescriptor) :
@@ -1193,8 +1201,8 @@ class MediaHttpServer(
         // between, i.e. folder mode; single-file keeps just play/pause, skip, and seek.
         val panelToggles = if (isFolderMode) {
             """
-                <label class="toggle"><input type="checkbox" id="autoplayToggle"> Autoplay</label>
-                <label class="toggle"><input type="checkbox" id="shuffleToggle"> Random</label>
+                <label class="toggle"><input type="checkbox" id="autoplayToggle">$autoPlayIconSvg Auto play</label>
+                <label class="toggle"><input type="checkbox" id="shuffleToggle">$randomPlayIconSvg</label>
             """.trimIndent()
         } else {
             ""
@@ -1218,18 +1226,27 @@ class MediaHttpServer(
                   <p class="nowPlayingLabel">Now playing on every connected viewer</p>
                   <p class="nowPlayingTitle">${escapeHtml(currentEntry.name)}</p>
                 </div>
+                <button type="button" id="exitRemoteButton" class="exitButton">
+                  $exitIconSvg
+                  Exit
+                </button>
+              </div>
+              <div class="playFunctionPanel">
                 $panelToggles
-                <button type="button" id="exitRemoteButton" class="exitButton">Exit remote mode</button>
               </div>
               <div class="transportControls">
-                $prevButtonHtml
-                <button type="button" id="skipBackButton" class="ctrlButton skipButton navButton" aria-label="Skip back $skipSeconds seconds">$skipBackIconSvg<span class="skipNum">$skipSeconds</span></button>
-                <button type="button" id="playPauseButton" class="ctrlButton" aria-label="Play or pause">&#9654;</button>
-                <button type="button" id="skipForwardButton" class="ctrlButton skipButton navButton" aria-label="Skip forward $skipSeconds seconds">$skipForwardIconSvg<span class="skipNum">$skipSeconds</span></button>
-                $nextButtonHtml
-                <span id="currentTimeLabel" class="timeLabel">0:00</span>
-                <input type="range" id="seekBar" class="seekBar" min="0" max="0" value="0" step="0.1">
-                <span id="durationLabel" class="timeLabel">0:00</span>
+                <div class="transportControlsSection">
+                  $prevButtonHtml
+                  <button type="button" id="skipBackButton" class="ctrlButton skipButton navButton" aria-label="Skip back $skipSeconds seconds">$skipBackIconSvg<span class="skipNum">$skipSeconds</span></button>
+                  <button type="button" id="playPauseButton" class="ctrlButton" aria-label="Play or pause">$playIconSvg</button>
+                  <button type="button" id="skipForwardButton" class="ctrlButton skipButton navButton" aria-label="Skip forward $skipSeconds seconds">$skipForwardIconSvg<span class="skipNum">$skipSeconds</span></button>
+                  $nextButtonHtml
+                </div>
+                <div class="transportControlsSection">
+                  <span id="currentTimeLabel" class="timeLabel">0:00</span>
+                  <input type="range" id="seekBar" class="seekBar" min="0" max="0" value="0" step="0.1">
+                  <span id="durationLabel" class="timeLabel">0:00</span>
+                </div>
               </div>
               <video id="player" class="hiddenVideo" muted autoplay playsinline preload="auto">
                 <source src="/video?id=${currentEntry.id}" type="${guessVideoMimeType(currentEntry.name)}">
@@ -1289,13 +1306,19 @@ class MediaHttpServer(
                 .nowPlayingTitle { margin: 0; font-size: 14px; word-break: break-word; }
                 .exitButton {
                   flex-shrink: 0; padding: 8px 14px; border-radius: 999px; border: none; cursor: pointer;
-                  background: #262a36; color: #eee; font-size: 12px; font: inherit;
+                  background: #c66666; color: #eee; font-size: 12px; font: inherit; display: flex; column-gap: 5px; align-items: center;
                 }
-                .exitButton:hover { background: #333846; }
+                .exitButton:hover { background: #e07f7f; }
+                .playFunctionPanel {
+                  display: flex; gap: 10px;
+                }
                 .toggle {
                   display: flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px;
                   background: #262a36; font-size: 12px; color: #ccc; white-space: nowrap; cursor: pointer;
                   flex-shrink: 0;
+                }
+                .toggle > input {
+                    display: none;
                 }
                 .toggle:has(input:checked) { background: var(--accent); color: #fff; }
                 /* This is a control panel, not a viewing screen — the video itself stays loaded
@@ -1310,11 +1333,14 @@ class MediaHttpServer(
                   opacity: 0; pointer-events: none;
                 }
                 .transportControls {
-                  display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+                  display: flex; flex-wrap: wrap-reverse; align-items: center; gap: 10px; padding: 10px 14px;
                   background: #1c1f28; border-radius: 12px;
                 }
+                .transportControlsSection {
+                  display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%;
+                }
                 .ctrlButton {
-                  flex-shrink: 0; width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer;
+                  flex-shrink: 0; width: 45px; height: 45px; border-radius: 50%; border: none; cursor: pointer;
                   background: var(--accent); color: #fff; font-size: 15px; line-height: 1;
                   display: flex; align-items: center; justify-content: center;
                 }

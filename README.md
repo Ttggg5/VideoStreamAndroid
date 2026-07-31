@@ -92,8 +92,10 @@ with a built-in screen to open another device's stream.
   whatever `/remote` is currently playing and follows play/pause/seek/
   video-switch commands as they arrive. An **Exit remote mode** button on
   the control panel calls
-  `/remote/clear`, which sends every one of those bare viewer pages back
-  to a normal watch page with its own controls restored. Until `/remote`
+  `/remote/clear`, which stops playback on every one of those bare viewers
+  and takes them out of the player — a folder viewer drops back to the
+  browse list (native app) or `/browse` (web), and a single-file viewer,
+  with nothing else to show, leaves the player entirely. Until `/remote`
   is used for the first time, nothing changes for anyone — it's entirely
   additive. `RemoteControlActivity` is a thin `WebView` wrapper the host
   app uses to open its own `/remote` page without leaving the app; the

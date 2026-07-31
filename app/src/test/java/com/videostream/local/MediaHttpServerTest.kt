@@ -532,17 +532,33 @@ class MediaHttpServerTest {
     }
 
     @Test
-    fun `bare player hands control back to a normal watch page once the remote is cleared`() {
+    fun `bare folder player returns to the browse list once the remote is cleared`() {
         val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
         val httpServer = startServer(entries, isFolderMode = true)
 
         val (code, body) = get(httpServer, "/watch?id=1&remote=1")
 
         assertEquals(200, code)
+        // Exiting remote mode stops playback and leaves the bare player rather than resuming a
+        // self-controlled one; a folder viewer lands back on the browse listing.
         assertTrue(
-            "bare player should fall back to the normal watch page once state.videoId goes null",
-            body.contains("location.href = '/watch?id=' + currentId;")
+            "bare folder player should leave for the browse list once state.videoId goes null",
+            body.contains("location.href = '/browse';")
         )
+        assertFalse(body.contains("location.href = '/watch?id=' + currentId;"))
+    }
+
+    @Test
+    fun `bare single-file player stops and ends once the remote is cleared`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = false)
+
+        val (code, body) = get(httpServer, "/watch?id=1&remote=1")
+
+        assertEquals(200, code)
+        // Single-file has no browse to return to, so it stops and shows the session ended.
+        assertTrue(body.contains("Remote control ended."))
+        assertFalse(body.contains("location.href = '/watch?id=' + currentId;"))
     }
 
     @Test

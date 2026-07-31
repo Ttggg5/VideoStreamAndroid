@@ -800,11 +800,17 @@ class WatchActivity : BaseActivity() {
                 state.seekSeconds?.let { exoPlayer?.seekTo((it * 1000).toLong()) }
             }
         } else if (remoteFollowVideoId != null) {
-            // The host left remote mode — hand control back to a normal player for whatever's
-            // already loaded, the same as the bare web viewer falling back to a normal watch page.
-            remoteFollowVideoId = null
-            followingRemote = false
-            if (screen == Screen.PLAYER) applyControllerVisible(true)
+            // The host left remote mode. The viewer is only in this player because the host put
+            // them here, so stop playback and leave the player — back to the browse list for a
+            // folder host, or all the way out (disconnect) for a single-file host, which has
+            // nothing else to show.
+            if (libraryInfo?.isFolderMode == true) {
+                resetRemoteFollowState()
+                releasePlayer()
+                showBrowse()
+            } else {
+                disconnect()
+            }
         }
     }
 

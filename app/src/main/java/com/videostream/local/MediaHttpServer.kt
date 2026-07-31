@@ -976,6 +976,15 @@ class MediaHttpServer(
         // The remote can pick any video in the whole library, not just this one's folder
         // siblings, so (unlike watchPage's playlistJson) this needs every entry's MIME type.
         val videoTypesJson = "{" + entries.joinToString(",") { "\"${it.id}\":${jsonString(guessVideoMimeType(it.name))}" } + "}"
+        // When the host exits remote mode this viewer should stop and leave the bare player, not
+        // resume a self-controlled one: a folder viewer goes back to the browse listing, and a
+        // single-file viewer (with nowhere to browse to) stops and shows that the session ended.
+        val onRemoteClearedJs = if (isFolderMode) {
+            "location.href = '/browse';"
+        } else {
+            "player.pause(); document.body.innerHTML = " +
+                "'<div style=\"height:100vh;display:flex;align-items:center;justify-content:center;color:#aaa;font-family:sans-serif;font-size:16px;\">Remote control ended.</div>';"
+        }
         val html = """
             <!DOCTYPE html>
             <html>
@@ -1057,9 +1066,8 @@ class MediaHttpServer(
 
                 function applyState(state) {
                   if (state.videoId === null) {
-                    // The remote's been cleared — hand control back to a normal watch page
-                    // with its own controls instead of sitting on a bare screen forever.
-                    location.href = '/watch?id=' + currentId;
+                    // The host left remote mode — stop playback and leave the bare player.
+                    $onRemoteClearedJs
                     return;
                   }
                   if (state.videoId !== currentId) {

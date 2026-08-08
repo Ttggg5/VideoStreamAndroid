@@ -309,6 +309,39 @@ class MediaHttpServerTest {
     }
 
     @Test
+    fun `remote page offers an all-videos view when there are subfolders`() {
+        val entries = listOf(
+            VideoEntry(id = 1, name = "a.mp4", folderPath = "Movies", uri = fakeUri()),
+            VideoEntry(id = 2, name = "b.mp4", folderPath = "Shows", uri = fakeUri())
+        )
+        val httpServer = startServer(entries, isFolderMode = true)
+
+        val (_, body) = get(httpServer, "/remote")
+
+        assertTrue("remote should offer an All videos toggle", body.contains("All videos"))
+        assertTrue(body.contains("flat=1"))
+    }
+
+    @Test
+    fun `remote all-videos view lists every video across folders with its folder shown`() {
+        val entries = listOf(
+            VideoEntry(id = 1, name = "a.mp4", folderPath = "Movies", uri = fakeUri()),
+            VideoEntry(id = 2, name = "b.mp4", folderPath = "Shows", uri = fakeUri())
+        )
+        val httpServer = startServer(entries, isFolderMode = true)
+
+        val (code, body) = get(httpServer, "/remote?flat=1")
+
+        assertEquals(200, code)
+        // Both videos, though in different subfolders, appear in one flat list...
+        assertTrue(body.contains("a.mp4"))
+        assertTrue(body.contains("b.mp4"))
+        // ...each tagged with its folder for context.
+        assertTrue(body.contains("class=\"sub\">Movies"))
+        assertTrue(body.contains("class=\"sub\">Shows"))
+    }
+
+    @Test
     fun `remote control panel offers autoplay and skip controls`() {
         val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
         val httpServer = startServer(entries, isFolderMode = true)

@@ -185,7 +185,8 @@ class MediaHttpServer(
             "/thumbnail" -> serveThumbnail(session)
             "/remote" -> remotePage(
                 session.parameters["path"]?.firstOrNull().orEmpty(),
-                SortMode.fromParam(session.parameters["sort"]?.firstOrNull() ?: defaultSortParam)
+                SortMode.fromParam(session.parameters["sort"]?.firstOrNull() ?: defaultSortParam),
+                session.parameters["flat"]?.firstOrNull() == "1"
             )
             "/remote/state" -> remoteStateJson()
             "/remote/select" -> handleRemoteSelect(session)
@@ -1131,19 +1132,20 @@ class MediaHttpServer(
      * nothing to pick between, so the browser/grid and the Prev/Next/Random/Autoplay controls are
      * dropped, but driving one video's play/pause/seek for everyone still works.
      */
-    private fun remotePage(path: String, sortMode: SortMode): Response {
+    private fun remotePage(path: String, sortMode: SortMode, flat: Boolean): Response {
         val current = remoteSelection.get()
         val currentEntry = current.videoId?.let { id -> entries.firstOrNull { it.id == id } }
+        val flatParam = if (flat) "1" else "0"
 
         val effectivePath: String
         val title: String
         val videos: List<VideoEntry>
         val subfolders: List<String>
         if (isFolderMode) {
-            val listing = computeListing(path, flat = false, sortMode)
+            val listing = computeListing(path, flat, sortMode)
                 ?: return newFixedLengthResponse(Response.Status.NOT_FOUND, "text/plain", "Folder not found")
             effectivePath = listing.effectivePath
-            title = listing.title
+            title = if (flat) "All videos" else listing.title
             videos = listing.videos
             subfolders = listing.subfolders
         } else {
@@ -1155,20 +1157,27 @@ class MediaHttpServer(
             subfolders = emptyList()
         }
 
+        // In flat ("All videos") mode there's no folder structure to walk, so the back link and
+        // subfolder rows are empty and the grid shows every video with its folder as a subtitle.
         val backLink = if (effectivePath.isNotEmpty()) {
             val parentPath = effectivePath.substringBeforeLast('/', "")
-            "<li><a class=\"back\" href=\"/remote?path=${encodePath(parentPath)}&sort=${sortMode.param}\">$chevronLeftIconSvg ..</a></li>"
+            "<li><a class=\"back\" href=\"/remote?path=${encodePath(parentPath)}&sort=${sortMode.param}&flat=0\">$chevronLeftIconSvg ..</a></li>"
         } else {
             ""
         }
         val folderItems = subfolders.joinToString("\n") { folderName ->
             val childPath = if (effectivePath.isEmpty()) folderName else "$effectivePath/$folderName"
-            "<li><a href=\"/remote?path=${encodePath(childPath)}&sort=${sortMode.param}\">$folderIconSvg ${escapeHtml(folderName)}</a></li>"
+            "<li><a href=\"/remote?path=${encodePath(childPath)}&sort=${sortMode.param}&flat=0\">$folderIconSvg ${escapeHtml(folderName)}</a></li>"
         }
         // Single-file mode has no grid to pick from — the one video is taken control of via the
         // placeholder's "Take control" button instead.
         val videoItems = if (!isFolderMode) "" else videos.joinToString("\n") { entry ->
             val selectedClass = if (entry.id == current.videoId) " selected" else ""
+            val subtitle = if (flat && entry.folderPath.isNotEmpty()) {
+                "<span class=\"sub\">${escapeHtml(entry.folderPath)}</span>"
+            } else {
+                ""
+            }
             """
             <li>
               <button type="button" class="videoCard$selectedClass" data-id="${entry.id}">
@@ -1177,6 +1186,7 @@ class MediaHttpServer(
                   <span class="play-badge">$playBadgeIconSvg</span>
                 </span>
                 <span class="title">${escapeHtml(entry.name)}</span>
+                $subtitle
               </button>
             </li>
             """.trimIndent()
@@ -1185,11 +1195,28 @@ class MediaHttpServer(
             if (mode == sortMode) {
                 "<span class=\"active\">${mode.label}</span>"
             } else {
-                "<a href=\"/remote?path=${encodePath(effectivePath)}&sort=${mode.param}\">${mode.label}</a>"
+                "<a href=\"/remote?path=${encodePath(effectivePath)}&sort=${mode.param}&flat=$flatParam\">${mode.label}</a>"
             }
         }
         val sortBar = if (videos.size > 1) {
             "<div class=\"bar\"><span class=\"label\">Sort:</span> $sortLinks</div>"
+        } else {
+            ""
+        }
+        // Folders vs. "All videos" toggle — only when the library actually has subfolders, and
+        // only in folder mode (single-file has just the one video).
+        val viewBar = if (isFolderMode && entries.any { it.folderPath.isNotEmpty() }) {
+            val foldersOption = if (!flat) {
+                "<span class=\"active\">Folders</span>"
+            } else {
+                "<a href=\"/remote?path=${encodePath("")}&sort=${sortMode.param}&flat=0\">Folders</a>"
+            }
+            val flatOption = if (flat) {
+                "<span class=\"active\">All videos</span>"
+            } else {
+                "<a href=\"/remote?path=${encodePath("")}&sort=${sortMode.param}&flat=1\">All videos</a>"
+            }
+            "<div class=\"bar\"><span class=\"label\">View:</span> $foldersOption $flatOption</div>"
         } else {
             ""
         }
@@ -1394,13 +1421,15 @@ class MediaHttpServer(
                 .videoCard .play-badge {
                   position: absolute; right: 6px; bottom: 6px; display: flex; opacity: 0.9;
                 }
-                .videoCard .title { display: block; padding: 8px; font-size: 13px; word-break: break-word; }
+                .videoCard .title { display: block; padding: 8px 8px 0; font-size: 13px; word-break: break-word; }
+                .videoCard .sub { display: block; padding: 2px 8px 8px; font-size: 11px; color: #888; word-break: break-word; }
               </style>
             </head>
             <body${if (currentEntry != null) " class=\"hasControlPanel\"" else ""}>
               <h1>${escapeHtml(title)}</h1>
               <p class="subtitle">${if (isFolderMode) "Every connected viewer sees exactly what plays here — pick a video, then use the player controls to drive playback for everyone." else "Every connected viewer sees exactly what plays here — use the player controls to drive playback for everyone."}</p>
               $playerSection
+              $viewBar
               <ul class="folders">
                 $backLink
                 $folderItems

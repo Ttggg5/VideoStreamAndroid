@@ -81,7 +81,10 @@ with a built-in screen to open another device's stream.
   through whichever folder's videos are currently listed on screen, in the
   active sort order; with Random turned on, Next instead jumps to a
   uniformly random video from that same list. The folder browser sits
-  below the floating panel; tapping a video calls `/remote/select`, and
+  below the floating panel — with a **Folders / All videos** view toggle
+  (when the library has subfolders) so the host can pick from one flat
+  list of every video, each tagged with its folder, instead of walking
+  the tree; tapping a video calls `/remote/select`, and
   using the transport controls calls `/remote/command`. Every other open
   `/browse`/`/watch` page keeps a WebSocket open to `/remote/ws`, which
   pushes the current state the instant it connects and again on every

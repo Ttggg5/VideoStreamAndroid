@@ -1367,24 +1367,26 @@ class MediaHttpServer(
                   display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%;
                 }
                 .ctrlButton {
-                  flex-shrink: 0; width: 45px; height: 45px; border-radius: 50%; border: none; cursor: pointer;
+                  flex-shrink: 0; width: 60px; height: 60px; border-radius: 50%; border: none; cursor: pointer;
                   background: var(--accent); color: #fff; font-size: 15px; line-height: 1;
                   display: flex; align-items: center; justify-content: center;
                 }
+                .ctrlButton svg { width: 46px; height: 46px; }
                 .ctrlButton:hover { opacity: 0.85; }
-                .ctrlButton.navButton { background: #262a36; width: 36px; height: 36px; }
+                .ctrlButton.navButton { background: #262a36; width: 48px; height: 48px; }
                 .ctrlButton.navButton:hover { background: #333846; }
+                .ctrlButton.navButton svg { width: 26px; height: 26px; }
                 /* Skip buttons pair a circular replay/forward arrow with the seconds count
                    overlaid in its hollow centre, so the exact jump size is visible on the button. */
                 .skipButton { position: relative; }
-                .skipButton svg { width: 22px; height: 22px; }
+                .ctrlButton.skipButton.navButton svg { width: 30px; height: 30px; }
                 .skipNum {
                   position: absolute; top: 50%; left: 50%; transform: translate(-50%, -42%);
-                  font-size: 9px; font-weight: 700; line-height: 1; pointer-events: none;
+                  font-size: 12px; font-weight: 700; line-height: 1; pointer-events: none;
                 }
                 .ctrlButton:disabled { opacity: 0.35; cursor: default; }
                 .ctrlButton:disabled:hover { background: #262a36; }
-                .timeLabel { flex-shrink: 0; width: 36px; font-size: 12px; color: #ccc; text-align: center; }
+                .timeLabel { flex-shrink: 0; width: 42px; font-size: 13px; color: #ccc; text-align: center; }
                 .seekBar { flex: 1; accent-color: var(--accent); cursor: pointer; }
                 .placeholder { margin: 0 0 20px; padding: 32px; text-align: center; color: #888; background: #1c1f28; border-radius: 12px; }
                 .bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; font-size: 13px; }

@@ -2,11 +2,90 @@
 <resources>
     <style name="Theme.VideoStreamLocal" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/brand_primary</item>
+
+        <!-- Neutral surface ramp (accent-independent, so the runtime accent overlay only has to
+             swap colorPrimary). Gives the Material 3 Expressive tonal-surface look. -->
+        <item name="android:colorBackground">@color/md_surface</item>
+        <item name="colorSurface">@color/md_surface</item>
+        <item name="colorSurfaceContainerLowest">@color/md_surface_container_lowest</item>
+        <item name="colorSurfaceContainerLow">@color/md_surface_container_low</item>
+        <item name="colorSurfaceContainer">@color/md_surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/md_surface_container_high</item>
+        <item name="colorSurfaceContainerHighest">@color/md_surface_container_highest</item>
+        <item name="colorSurfaceVariant">@color/md_surface_variant</item>
+        <item name="colorOnSurface">@color/md_on_surface</item>
+        <item name="colorOnSurfaceVariant">@color/md_on_surface_variant</item>
+        <item name="colorOutline">@color/md_outline</item>
+        <item name="colorOutlineVariant">@color/md_outline_variant</item>
+
+        <!-- Expressive corner rounding, applied to every component that reads the shape family. -->
+        <item name="shapeAppearanceCornerExtraSmall">@style/ShapeAppearance.App.ExtraSmall</item>
+        <item name="shapeAppearanceCornerSmall">@style/ShapeAppearance.App.Small</item>
+        <item name="shapeAppearanceCornerMedium">@style/ShapeAppearance.App.Medium</item>
+        <item name="shapeAppearanceCornerLarge">@style/ShapeAppearance.App.Large</item>
+        <item name="shapeAppearanceCornerExtraLarge">@style/ShapeAppearance.App.ExtraLarge</item>
+
+        <!-- Edge-to-edge, surface-colored system bars. -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">?attr/colorSurface</item>
+    </style>
+
+    <!-- Expressive corner families. -->
+    <style name="ShapeAppearance.App.ExtraSmall" parent="ShapeAppearance.Material3.Corner.ExtraSmall">
+        <item name="cornerSize">8dp</item>
+    </style>
+    <style name="ShapeAppearance.App.Small" parent="ShapeAppearance.Material3.Corner.Small">
+        <item name="cornerSize">14dp</item>
+    </style>
+    <style name="ShapeAppearance.App.Medium" parent="ShapeAppearance.Material3.Corner.Medium">
+        <item name="cornerSize">22dp</item>
+    </style>
+    <style name="ShapeAppearance.App.Large" parent="ShapeAppearance.Material3.Corner.Large">
+        <item name="cornerSize">28dp</item>
+    </style>
+    <style name="ShapeAppearance.App.ExtraLarge" parent="ShapeAppearance.Material3.Corner.ExtraLarge">
+        <item name="cornerSize">36dp</item>
+    </style>
+
+    <!-- Named component styles applied explicitly in layouts (rather than overriding the global
+         component styles) so the look stays predictable. -->
+
+    <!-- Filled, accent-tinted primary action pill. -->
+    <style name="Widget.App.Button" parent="Widget.Material3.Button">
+        <item name="android:paddingTop">14dp</item>
+        <item name="android:paddingBottom">14dp</item>
+        <item name="android:textAppearance">?attr/textAppearanceLabelLarge</item>
+    </style>
+
+    <!-- Neutral "tonal" pill built on a surface container (accent-independent). -->
+    <style name="Widget.App.Button.Tonal" parent="Widget.Material3.Button.TonalButton">
+        <item name="backgroundTint">?attr/colorSurfaceContainerHighest</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+        <item name="iconTint">?attr/colorPrimary</item>
+        <item name="android:paddingTop">14dp</item>
+        <item name="android:paddingBottom">14dp</item>
+    </style>
+
+    <!-- Filled card sitting on a surface container, expressive large corners. -->
+    <style name="Widget.App.Card" parent="Widget.Material3.CardView.Filled">
+        <item name="cardBackgroundColor">?attr/colorSurfaceContainer</item>
+        <item name="cardCornerRadius">28dp</item>
+        <item name="cardElevation">0dp</item>
+        <item name="contentPadding">0dp</item>
+    </style>
+
+    <!-- Section heading over a group of controls. -->
+    <style name="TextAppearance.App.SectionLabel" parent="TextAppearance.Material3.LabelLarge">
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.08</item>
+        <item name="android:textSize">12sp</item>
     </style>
 
     <!-- Applied at runtime (AppSettings.applyAccentOverlay) on top of Theme.VideoStreamLocal,
          one per Settings > Accent color choice. Each just swaps colorPrimary, which is enough
-         to retint every MaterialButton/MaterialCardView icon and highlight in the app. -->
+         to retint every accent-tinted button/icon/highlight in the app; the neutral surface
+         ramp above is deliberately accent-independent so it stays coherent whatever the accent. -->
     <style name="ThemeOverlay.Accent.Indigo" parent="">
         <item name="colorPrimary">#4A5FFF</item>
     </style>

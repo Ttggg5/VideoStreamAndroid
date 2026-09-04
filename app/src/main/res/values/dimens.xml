@@ -1,13 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Outer padding/margin for the main screens. Wider on large screens (see
-         values-sw600dp/dimens.xml) so content doesn't stretch edge-to-edge on a tablet. -->
+         values-sw600dp/dimens.xml) so content doesn't stretch edge-to-edge on a tablet or an
+         unfolded foldable. -->
     <dimen name="screen_horizontal_margin">24dp</dimen>
 
+    <!-- Spacing scale (Material 3, 4dp grid). -->
+    <dimen name="space_xs">4dp</dimen>
+    <dimen name="space_s">8dp</dimen>
+    <dimen name="space_m">16dp</dimen>
+    <dimen name="space_l">24dp</dimen>
+    <dimen name="space_xl">32dp</dimen>
+
     <!-- Settings > Accent color swatches. -->
-    <dimen name="accent_swatch_size">44dp</dimen>
-    <dimen name="accent_swatch_margin">14dp</dimen>
+    <dimen name="accent_swatch_size">48dp</dimen>
+    <dimen name="accent_swatch_margin">12dp</dimen>
 
     <!-- Corner radius for the browse grid's folder/video thumbnail tiles. -->
-    <dimen name="browse_thumbnail_corner_radius">12dp</dimen>
+    <dimen name="browse_thumbnail_corner_radius">18dp</dimen>
 </resources>

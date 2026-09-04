@@ -3,8 +3,26 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="brand_primary">#4A5FFF</color>
-    <color name="text">#FF000000</color>
-    <color name="stop">#AB5B5B</color>
-    <color name="start">#6A9E8A</color>
+    <color name="text">#FF1B1B21</color>
     <color name="transparent">#00000000</color>
+
+    <!-- Streaming start/stop accents used by HostActivity's toggle button. -->
+    <color name="start">#3B9E7A</color>
+    <color name="stop">#C0504D</color>
+
+    <!-- Material 3 neutral surface ramp (light). These don't depend on the accent color, so the
+         runtime accent overlay can keep swapping only colorPrimary while surfaces stay coherent
+         in both light and dark. See values-night/colors.xml for the dark values. -->
+    <color name="md_surface">#FBF8FE</color>
+    <color name="md_surface_container_lowest">#FFFFFF</color>
+    <color name="md_surface_container_low">#F5F2FA</color>
+    <color name="md_surface_container">#EFECF4</color>
+    <color name="md_surface_container_high">#E9E6EF</color>
+    <color name="md_surface_container_highest">#E3E0E9</color>
+    <color name="md_surface_variant">#E3E0EC</color>
+    <color name="md_on_surface">#1B1B21</color>
+    <color name="md_on_surface_variant">#47464F</color>
+    <color name="md_outline">#787680</color>
+    <color name="md_outline_variant">#C8C5D0</color>
+    <color name="md_scrim">#99000000</color>
 </resources>

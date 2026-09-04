@@ -4,165 +4,203 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="?attr/colorSurface"
     android:padding="@dimen/screen_horizontal_margin"
     tools:context=".HostActivity">
 
-    <!-- Landscape splits the screen into a picker column (left) and a status/action
-         column (right) instead of stacking everything in one tall column. -->
+    <!-- Two-pane: the picker + preview on the left, the streaming action on the right, so the
+         extra width of a landscape phone / unfolded foldable is used instead of a tall column. -->
     <androidx.constraintlayout.widget.Guideline
-        android:id="@+id/midGuideline"
+        android:id="@+id/paneSplit"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        app:layout_constraintGuide_percent="0.55" />
+        app:layout_constraintGuide_percent="0.56" />
 
-    <!-- This row only has ~55% of the screen width to work with (everything left of
-         midGuideline), too little for icon+text buttons at typical landscape phone widths,
-         so landscape drops the labels and keeps icon-only buttons instead of risking their
-         text getting clipped; contentDescription keeps them accessible. -->
     <LinearLayout
         android:id="@+id/pickerButtons"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/paneSplit"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="@id/midGuideline">
+        app:layout_constraintTop_toTopOf="parent">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/chooseFileButton"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="wrap_content"
+            style="@style/Widget.App.Button.Tonal"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginEnd="8dp"
-            android:contentDescription="@string/choose_video"
-            app:icon="@drawable/ic_videocam"
-            android:text="@string/choose_video" />
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="@string/choose_video"
+            app:icon="@drawable/ic_videocam" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/chooseFolderButton"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="wrap_content"
+            style="@style/Widget.App.Button.Tonal"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:contentDescription="@string/choose_folder"
-            app:icon="@drawable/ic_folder"
-            android:text="@string/choose_folder" />
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="@string/choose_folder"
+            app:icon="@drawable/ic_folder" />
 
     </LinearLayout>
 
-    <LinearLayout
-        android:id="@+id/selectedPreview"
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/previewCard"
+        style="@style/Widget.App.Card"
         android:layout_width="0dp"
-        android:layout_height="180dp"
-        app:layout_constraintTop_toBottomOf="@id/pickerButtons"
+        android:layout_height="0dp"
+        android:layout_marginTop="14dp"
+        app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
+        app:cardCornerRadius="24dp"
+        app:layout_constraintBottom_toTopOf="@id/selectedFileText"
+        app:layout_constraintEnd_toStartOf="@id/paneSplit"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="@id/midGuideline"
-        android:orientation="vertical"
-        android:layout_marginTop="15dp">
+        app:layout_constraintTop_toBottomOf="@id/pickerButtons"
+        app:layout_constraintVertical_chainStyle="packed">
 
-        <ImageView
-            android:id="@+id/thumbnailPreview"
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@drawable/bg_rounded_thumbnail"
-            android:contentDescription="@string/selected_video_thumbnail"
-            android:scaleType="centerCrop"
-            android:clipToOutline="true"
-            android:visibility="gone"
-            tools:visibility="visible"/>
+            android:layout_height="match_parent">
 
-        <ImageView
-            android:id="@+id/folderPreview"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:src="@drawable/ic_folder"
-            app:tint="?attr/colorPrimary"
-            android:visibility="gone"/>
+            <ImageView
+                android:id="@+id/thumbnailPreview"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@string/selected_video_thumbnail"
+                android:scaleType="centerCrop"
+                android:visibility="gone"
+                tools:visibility="visible" />
 
-    </LinearLayout>
+            <ImageView
+                android:id="@+id/folderPreview"
+                android:layout_width="72dp"
+                android:layout_height="72dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_folder"
+                android:visibility="gone"
+                app:tint="?attr/colorPrimary" />
+
+        </FrameLayout>
+
+    </com.google.android.material.card.MaterialCardView>
 
     <TextView
         android:id="@+id/selectedFileText"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
         android:gravity="center"
-        android:textSize="16sp"
         android:text="@string/no_video_selected"
-        android:layout_marginTop="5dp"
-        app:layout_constraintTop_toBottomOf="@id/selectedPreview"
+        android:textAppearance="?attr/textAppearanceBodyLarge"
+        android:textColor="?attr/colorOnSurface"
+        app:layout_constraintBottom_toTopOf="@id/sortOptionRow"
+        app:layout_constraintEnd_toStartOf="@id/paneSplit"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="@id/midGuideline" />
+        app:layout_constraintTop_toBottomOf="@id/previewCard" />
 
-    <LinearLayout
+    <com.google.android.material.card.MaterialCardView
         android:id="@+id/sortOptionRow"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
+        android:layout_marginTop="12dp"
         android:visibility="gone"
+        app:cardBackgroundColor="?attr/colorSurfaceContainer"
+        app:cardCornerRadius="18dp"
+        app:cardElevation="0dp"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="@id/midGuideline"
+        app:layout_constraintEnd_toStartOf="@id/paneSplit"
         app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/selectedFileText"
         tools:visibility="visible">
 
-        <TextView
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginEnd="8dp"
-            android:text="@string/option_default_sort" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="18dp"
+            android:paddingTop="6dp"
+            android:paddingEnd="10dp"
+            android:paddingBottom="6dp">
 
-        <Spinner
-            android:id="@+id/defaultSortSpinner"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:text="@string/option_default_sort"
+                android:textColor="?attr/colorOnSurfaceVariant" />
 
-    </LinearLayout>
+            <Spinner
+                android:id="@+id/defaultSortSpinner"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
+
+        </LinearLayout>
+
+    </com.google.android.material.card.MaterialCardView>
+
+    <!-- Right pane: the big streaming toggle, its status line, and (while streaming) the
+         remote-control entry, packed and centered. -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/toggleButton"
+        android:layout_width="96dp"
+        android:layout_height="96dp"
+        android:enabled="false"
+        android:insetLeft="0dp"
+        android:insetTop="0dp"
+        android:insetRight="0dp"
+        android:insetBottom="0dp"
+        android:padding="0dp"
+        android:text="@string/start_streaming"
+        android:textSize="0dp"
+        app:cornerRadius="32dp"
+        app:icon="@drawable/ic_play_arrow"
+        app:iconGravity="textStart"
+        app:iconPadding="0dp"
+        app:iconSize="48dp"
+        app:iconTint="@color/white"
+        app:layout_constraintBottom_toTopOf="@id/statusText"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@id/paneSplit"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintVertical_chainStyle="packed" />
 
     <TextView
         android:id="@+id/statusText"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="24dp"
+        android:layout_marginTop="14dp"
         android:gravity="center"
-        android:textSize="16sp"
         android:text="@string/status_idle"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintBottom_toTopOf="@id/toggleButton"
-        app:layout_constraintStart_toEndOf="@id/midGuideline"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintVertical_chainStyle="packed" />
-
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/toggleButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="24dp"
-        android:layout_marginTop="16dp"
-        android:enabled="false"
-        android:text="@string/start_streaming"
-        android:textColor="@color/white"
-        app:icon="@drawable/ic_play_arrow"
-        app:iconTint="@color/white"
-        app:layout_constraintTop_toBottomOf="@id/statusText"
+        android:textAppearance="?attr/textAppearanceBodyMedium"
+        android:textColor="?attr/colorOnSurfaceVariant"
         app:layout_constraintBottom_toTopOf="@id/remoteControlButton"
-        app:layout_constraintStart_toEndOf="@id/midGuideline"
-        app:layout_constraintEnd_toEndOf="parent" />
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@id/paneSplit"
+        app:layout_constraintTop_toBottomOf="@id/toggleButton" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/remoteControlButton"
-        style="@style/Widget.Material3.Button.OutlinedButton"
+        style="@style/Widget.App.Button.Tonal"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="24dp"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="16dp"
         android:text="@string/remote_control"
         android:visibility="gone"
         app:icon="@drawable/ic_remote"
-        app:layout_constraintTop_toBottomOf="@id/toggleButton"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toEndOf="@id/midGuideline"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="@id/paneSplit"
+        app:layout_constraintTop_toBottomOf="@id/statusText"
         tools:visibility="visible" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

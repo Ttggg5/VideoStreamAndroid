@@ -164,6 +164,18 @@ with a built-in screen to open another device's stream.
   1–300s), and **Vibrate on control button** (a short buzz when pressing a
   Remote Control button, on by default).
 
+- **Look & adaptivity**: the UI follows **Material 3 Expressive** — a
+  neutral tonal surface ramp (accent-independent, so the accent overlay
+  only ever swaps `colorPrimary`), large expressive corners, and filled/
+  tonal pill buttons — defined once in `themes.xml` and reused across every
+  screen. Layouts adapt to large and foldable screens: the landing and Host
+  screens switch to a **two-pane** layout in landscape / when unfolded, and
+  content is width-capped and centered rather than stretched edge-to-edge
+  on a tablet or an unfolded inner display. The served web pages (browse /
+  watch / remote) are likewise responsive — centered max-width containers,
+  fluid `auto-fill` grids, and `clamp()`-based spacing — so they read well
+  from a phone up to a foldable's inner screen.
+
 Any modern browser plays the stream directly with a `<video>` tag —
 no app or plugin needed on the viewing device. Desktop media players like
 VLC can also open the `http://<ip>:<port>/video` URL directly.

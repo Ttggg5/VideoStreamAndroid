@@ -4,131 +4,171 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="?attr/colorSurface"
     tools:context=".WatchActivity">
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:id="@+id/preConnectSection"
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:paddingHorizontal="@dimen/screen_horizontal_margin"
+        android:paddingTop="16dp">
 
-        <TableLayout
-            android:id="@+id/directConnectSection"
-            android:layout_width="match_parent"
+        <TextView
+            android:id="@+id/watchHeader"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            app:layout_constraintTop_toTopOf="parent"
-            android:stretchColumns="0">
-            <TableRow>
-                <com.google.android.material.textfield.TextInputLayout
-                    android:id="@+id/addressInputLayout"
+            android:text="@string/watch_a_stream"
+            android:textAppearance="?attr/textAppearanceHeadlineSmall"
+            android:textColor="?attr/colorOnSurface"
+            android:textStyle="bold"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <LinearLayout
+            android:id="@+id/directConnectSection"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:baselineAligned="false"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/watchHeader">
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/addressInputLayout"
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="@string/watch_address_hint">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/addressInput"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_margin="16dp"
-                    android:hint="@string/watch_address_hint"
-                    app:layout_constraintEnd_toStartOf="@id/connectButton"
-                    app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toTopOf="parent">
+                    android:imeOptions="actionGo"
+                    android:inputType="textUri"
+                    android:singleLine="true" />
 
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/addressInput"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:imeOptions="actionGo"
-                        android:inputType="textUri"
-                        android:singleLine="true" />
+            </com.google.android.material.textfield.TextInputLayout>
 
-                </com.google.android.material.textfield.TextInputLayout>
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/connectButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:contentDescription="@string/watch_connect"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:minWidth="0dp"
+                android:paddingHorizontal="18dp"
+                app:icon="@drawable/ic_arrow_forward"
+                app:iconGravity="textStart"
+                app:iconPadding="0dp" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/connectButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginEnd="16dp"
-                    android:text="@string/watch_connect"
-                    app:icon="@drawable/ic_arrow_forward"
-                    app:layout_constraintBottom_toBottomOf="@id/addressInputLayout"
-                    app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintTop_toTopOf="@id/addressInputLayout"
-                    android:layout_gravity="center_vertical"/>
-            </TableRow>
-
-        </TableLayout>
+        </LinearLayout>
 
         <ProgressBar
             android:id="@+id/loadingProgress"
             style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
             android:indeterminate="true"
             android:visibility="gone"
-            app:layout_constraintTop_toBottomOf="@id/directConnectSection"
+            app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintEnd_toEndOf="parent" />
+            app:layout_constraintTop_toBottomOf="@id/directConnectSection" />
 
         <ScrollView
             android:layout_width="0dp"
             android:layout_height="0dp"
+            android:layout_marginTop="16dp"
+            android:clipToPadding="false"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/loadingProgress">
+            app:layout_constraintTop_toBottomOf="@id/loadingProgress">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:paddingLeft="16dp"
-                android:paddingRight="16dp"
                 android:paddingBottom="16dp">
 
-                <LinearLayout
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/Widget.App.Card"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
+                    app:cardBackgroundColor="?attr/colorSurfaceContainer"
+                    app:cardCornerRadius="24dp">
 
-                    <TextView
-                        android:layout_width="0dp"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/watch_discovery_title"
-                        android:textStyle="bold" />
+                        android:orientation="vertical"
+                        android:paddingHorizontal="16dp"
+                        android:paddingVertical="10dp">
 
-                    <ProgressBar
-                        android:id="@+id/discoveryProgress"
-                        android:layout_width="20dp"
-                        android:layout_height="20dp"
-                        android:layout_marginEnd="8dp"
-                        android:indeterminate="true"
-                        android:visibility="gone" />
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
 
-                    <ImageButton
-                        android:id="@+id/discoveryRefreshButton"
-                        style="?android:attr/borderlessButtonStyle"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:contentDescription="@string/watch_discovery_refresh"
-                        android:src="@drawable/ic_refresh"
-                        app:tint="?attr/colorPrimary" />
+                            <TextView
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="@string/watch_discovery_title"
+                                android:textAppearance="?attr/textAppearanceTitleSmall"
+                                android:textColor="?attr/colorOnSurface"
+                                android:textStyle="bold" />
 
-                </LinearLayout>
+                            <ProgressBar
+                                android:id="@+id/discoveryProgress"
+                                android:layout_width="20dp"
+                                android:layout_height="20dp"
+                                android:layout_marginEnd="8dp"
+                                android:indeterminate="true"
+                                android:visibility="gone" />
 
-                <LinearLayout
-                    android:id="@+id/discoveredHostsList"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:orientation="vertical" />
+                            <ImageButton
+                                android:id="@+id/discoveryRefreshButton"
+                                style="?android:attr/borderlessButtonStyle"
+                                android:layout_width="40dp"
+                                android:layout_height="40dp"
+                                android:contentDescription="@string/watch_discovery_refresh"
+                                android:src="@drawable/ic_refresh"
+                                app:tint="?attr/colorPrimary" />
 
-                <TextView
-                    android:id="@+id/discoveryEmptyText"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="@string/watch_discovery_empty"
-                    android:textColor="?android:attr/textColorSecondary"
-                    android:textSize="13sp"
-                    android:visibility="gone"
-                    tools:visibility="visible" />
+                        </LinearLayout>
+
+                        <LinearLayout
+                            android:id="@+id/discoveredHostsList"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="6dp"
+                            android:orientation="vertical" />
+
+                        <TextView
+                            android:id="@+id/discoveryEmptyText"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:text="@string/watch_discovery_empty"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:textSize="13sp"
+                            android:visibility="gone"
+                            tools:visibility="visible" />
+
+                    </LinearLayout>
+
+                </com.google.android.material.card.MaterialCardView>
 
                 <TextView
                     android:id="@+id/watchHintText"
@@ -136,14 +176,13 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="24dp"
                     android:gravity="center"
-                    android:text="@string/watch_hint" />
+                    android:text="@string/watch_hint"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
 
             </LinearLayout>
 
         </ScrollView>
     </androidx.constraintlayout.widget.ConstraintLayout>
-
-
 
     <!-- Native folder/video browser — replaces the WebView-rendered /browse page. Shown once
          connected to a folder-mode host; a single-file host skips straight to playerSection. -->
@@ -151,43 +190,48 @@
         android:id="@+id/browseSection"
         android:layout_width="0dp"
         android:layout_height="0dp"
+        android:background="?attr/colorSurface"
         android:visibility="gone"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <ImageButton
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/browseBackButton"
-            style="?android:attr/borderlessButtonStyle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_margin="8dp"
+            style="@style/Widget.Material3.Button.IconButton"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginTop="8dp"
             android:contentDescription="@string/watch_back"
-            android:src="@drawable/ic_arrow_back"
-            app:layout_constraintTop_toTopOf="parent"
-            app:layout_constraintStart_toStartOf="parent" />
+            app:icon="@drawable/ic_arrow_back"
+            app:iconTint="?attr/colorOnSurface"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
         <TextView
             android:id="@+id/browseTitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
+            android:layout_marginEnd="16dp"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textSize="18sp"
+            android:textAppearance="?attr/textAppearanceTitleLarge"
+            android:textColor="?attr/colorOnSurface"
             android:textStyle="bold"
-            app:layout_constraintTop_toTopOf="@id/browseBackButton"
             app:layout_constraintBottom_toBottomOf="@id/browseBackButton"
-            app:layout_constraintStart_toEndOf="@id/browseBackButton"
             app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toEndOf="@id/browseBackButton"
+            app:layout_constraintTop_toTopOf="@id/browseBackButton"
             tools:text="Movies" />
 
         <LinearLayout
             android:id="@+id/browseOptionsRow"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
+            android:layout_marginTop="6dp"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingHorizontal="16dp"
@@ -212,10 +256,11 @@
             android:id="@+id/browseRecyclerView"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            android:visibility="invisible"
             android:clipToPadding="false"
-            android:paddingHorizontal="12dp"
+            android:paddingHorizontal="8dp"
+            android:paddingTop="8dp"
             android:paddingBottom="16dp"
+            android:visibility="invisible"
             app:layout_constraintTop_toBottomOf="@id/browseOptionsRow"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
@@ -242,7 +287,7 @@
             android:layout_margin="24dp"
             android:gravity="center"
             android:text="@string/watch_browse_failed"
-            android:textColor="?android:attr/textColorSecondary"
+            android:textColor="?attr/colorOnSurfaceVariant"
             android:visibility="gone"
             app:layout_constraintTop_toBottomOf="@id/browseOptionsRow"
             app:layout_constraintBottom_toBottomOf="parent"
@@ -275,7 +320,8 @@
             app:layout_constraintEnd_toEndOf="parent" />
 
         <!-- Sits above the player's own control bar; hidden entirely while following a
-             /remote pick, since that mode has no local controls of its own either. -->
+             /remote pick, since that mode has no local controls of its own either. Always
+             white-on-scrim since it floats over the black video regardless of app theme. -->
         <LinearLayout
             android:id="@+id/playerTopBar"
             android:layout_width="match_parent"
@@ -295,7 +341,8 @@
                 android:layout_height="wrap_content"
                 android:layout_margin="8dp"
                 android:contentDescription="@string/watch_back"
-                android:src="@drawable/ic_arrow_back"/>
+                android:src="@drawable/ic_arrow_back"
+                app:tint="@color/white" />
 
             <TextView
                 android:id="@+id/playerTitle"
@@ -304,8 +351,8 @@
                 android:layout_weight="1"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:textColor="@color/text"
-                android:textSize="14sp"
+                android:textColor="@color/white"
+                android:textSize="15sp"
                 tools:text="episode-01.mp4" />
 
         </LinearLayout>

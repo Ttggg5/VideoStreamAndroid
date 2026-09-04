@@ -507,47 +507,65 @@ class MediaHttpServer(
               <meta name="viewport" content="width=device-width, initial-scale=1">
               <title>${escapeHtml(title)}</title>
               <style>
-                :root { --accent: $accentColorHex; }
+                :root {
+                  --accent: $accentColorHex;
+                  --bg: #121218; --surface: #1e1e25; --surface-hi: #29282f;
+                  --text: #e5e1e9; --muted: #c8c5d0; --faint: #918f9a;
+                  --radius-l: 24px; --radius-m: 18px;
+                }
                 * { box-sizing: border-box; }
                 body {
-                  margin: 0; padding: 24px; background: #111319; color: #eee;
+                  margin: 0 auto; max-width: 1120px;
+                  padding: max(20px, env(safe-area-inset-top)) clamp(16px, 4vw, 40px) 40px;
+                  background: var(--bg); color: var(--text);
                   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                  -webkit-font-smoothing: antialiased;
                 }
-                h1 { font-size: 21px; margin: 0 0 16px; letter-spacing: -0.01em; }
-                .bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; font-size: 13px; }
-                .bar .label { color: #888; margin-right: 2px; }
+                h1 {
+                  font-size: clamp(22px, 5vw, 30px); font-weight: 700;
+                  margin: 8px 0 18px; letter-spacing: -0.02em;
+                }
+                .bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; font-size: 14px; }
+                .bar .label { color: var(--faint); margin-right: 2px; }
                 .bar a, .bar .active {
-                  padding: 6px 14px; border-radius: 999px; text-decoration: none; font-size: 13px;
+                  padding: 9px 18px; border-radius: 999px; text-decoration: none; font-size: 14px;
+                  transition: background 0.15s ease, color 0.15s ease;
                 }
-                .bar a { color: #ccc; background: #1c1f28; }
-                .bar a:hover { background: #262a36; }
+                .bar a { color: var(--muted); background: var(--surface); }
+                .bar a:hover { background: var(--surface-hi); }
                 .bar .active { background: var(--accent); color: #fff; font-weight: 600; }
-                ul.folders { list-style: none; padding: 0; margin: 0 0 16px; }
-                ul.folders li { margin: 6px 0; }
+                ul.folders { list-style: none; padding: 0; margin: 0 0 18px; display: grid; gap: 10px;
+                  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
+                ul.folders li { margin: 0; }
                 ul.folders a {
-                  display: flex; align-items: center; gap: 10px; padding: 12px 16px;
-                  background: #1c1f28; color: #fff; text-decoration: none; border-radius: 12px;
-                  transition: background 0.15s ease;
+                  display: flex; align-items: center; gap: 12px; padding: 16px 18px;
+                  background: var(--surface); color: var(--text); text-decoration: none;
+                  border-radius: var(--radius-m); font-size: 15px;
+                  transition: background 0.15s ease, transform 0.15s ease;
                 }
-                ul.folders a:hover { background: #262a36; }
-                ul.folders a.back { color: #ccc; }
+                ul.folders a:hover { background: var(--surface-hi); transform: translateY(-1px); }
+                ul.folders a.back { color: var(--muted); }
                 ul.videos {
                   list-style: none; padding: 0; margin: 0; display: grid;
-                  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px;
+                  grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr)); gap: 16px;
                 }
                 ul.videos a {
-                  display: flex; flex-direction: column; background: #1c1f28; color: #fff;
-                  text-decoration: none; border-radius: 12px; overflow: hidden;
-                  transition: transform 0.15s ease, background 0.15s ease;
+                  display: flex; flex-direction: column; background: var(--surface); color: var(--text);
+                  text-decoration: none; border-radius: var(--radius-m); overflow: hidden;
+                  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
                 }
-                ul.videos a:hover { background: #262a36; transform: translateY(-2px); }
+                ul.videos a:hover {
+                  background: var(--surface-hi); transform: translateY(-3px);
+                  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35);
+                }
                 ul.videos .thumb { display: block; position: relative; background: #000; }
                 ul.videos .thumb img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
                 ul.videos .play-badge {
-                  position: absolute; right: 6px; bottom: 6px; display: flex; opacity: 0.9;
+                  position: absolute; right: 8px; bottom: 8px; display: flex; opacity: 0.92;
                 }
-                ul.videos .title { display: block; padding: 8px; font-size: 13px; word-break: break-word; }
-                ul.videos small { display: block; padding: 0 8px 8px; margin-top: -8px; color: #888; font-size: 11px; word-break: break-word; }
+                ul.videos .title { display: block; padding: 11px 12px 4px; font-size: 14px; font-weight: 500; word-break: break-word; }
+                ul.videos small { display: block; padding: 0 12px 12px; color: var(--faint); font-size: 12px; word-break: break-word; }
+                ul.videos a .title:last-child { padding-bottom: 12px; }
               </style>
             </head>
             <body>
@@ -705,20 +723,34 @@ class MediaHttpServer(
               <title>${escapeHtml(entry.name)}</title>
               <link href="/assets/videojs/video-js.min.css" rel="stylesheet">
               <style>
-                :root { --accent: $accentColorHex; }
+                :root {
+                  --accent: $accentColorHex;
+                  --bg: #121218; --surface: #1e1e25; --surface-hi: #29282f;
+                  --text: #e5e1e9; --muted: #c8c5d0; --line: rgba(255,255,255,0.08);
+                }
                 * { box-sizing: border-box; }
                 html, body {
-                  margin: 0; height: 100%; background: #111319; color: #eee;
+                  margin: 0; height: 100%; background: var(--bg); color: var(--text);
                   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                  -webkit-font-smoothing: antialiased;
                 }
                 body { display: flex; flex-direction: column; }
-                .topbar { display: flex; align-items: center; gap: 16px; padding: 10px 16px; flex-shrink: 0; flex-wrap: wrap; }
-                .back { display: flex; align-items: center; gap: 4px; color: #9db0ff; text-decoration: none; flex-shrink: 0; }
-                #currentTitle { font-size: 14px; color: #ccc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-                .controls { display: flex; gap: 12px; align-items: center; margin-left: auto; }
+                .topbar {
+                  display: flex; align-items: center; gap: 14px; flex-shrink: 0; flex-wrap: wrap;
+                  padding: max(10px, env(safe-area-inset-top)) clamp(12px, 3vw, 20px) 10px;
+                }
+                .back {
+                  display: flex; align-items: center; gap: 4px; color: var(--text); text-decoration: none;
+                  flex-shrink: 0; padding: 8px 14px 8px 10px; border-radius: 999px; background: var(--surface);
+                  transition: background 0.15s ease;
+                }
+                .back:hover { background: var(--surface-hi); }
+                #currentTitle { font-size: 15px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                .controls { display: flex; gap: 10px; align-items: center; margin-left: auto; }
                 .toggle {
-                  display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
-                  background: #1c1f28; font-size: 12px; color: #ccc; white-space: nowrap; cursor: pointer;
+                  display: flex; align-items: center; gap: 6px; padding: 9px 15px; border-radius: 999px;
+                  background: var(--surface); font-size: 13px; color: var(--muted); white-space: nowrap; cursor: pointer;
+                  transition: background 0.15s ease, color 0.15s ease;
                 }
                 .toggle:has(input:checked) { background: var(--accent); color: #fff; }
                 .main { flex: 1; display: flex; min-height: 0; }
@@ -781,15 +813,15 @@ class MediaHttpServer(
                   color: var(--accent);
                 }
                 .video-js .vjs-nav-button:disabled { cursor: default; opacity: 0.35; }
-                .playlist { width: 280px; flex-shrink: 0; overflow-y: auto; border-left: 1px solid #222; list-style: none; margin: 0; padding: 0; }
-                .playlist li { display: flex; gap: 10px; align-items: center; padding: 8px 12px; cursor: pointer; border-radius: 10px; margin: 4px 6px; }
-                .playlist li:hover { background: #1c1f28; }
-                .playlist li.active { background: #1c1f28; box-shadow: inset 3px 0 0 var(--accent); }
-                .playlist img { width: 72px; aspect-ratio: 16 / 9; object-fit: cover; background: #000; border-radius: 8px; flex-shrink: 0; }
-                .playlist span { font-size: 12px; word-break: break-word; }
-                @media (max-width: 700px) {
+                .playlist { width: 300px; flex-shrink: 0; overflow-y: auto; border-left: 1px solid var(--line); list-style: none; margin: 0; padding: 6px; }
+                .playlist li { display: flex; gap: 12px; align-items: center; padding: 8px; cursor: pointer; border-radius: 14px; margin: 4px 2px; transition: background 0.15s ease; }
+                .playlist li:hover { background: var(--surface); }
+                .playlist li.active { background: var(--surface-hi); box-shadow: inset 3px 0 0 var(--accent); }
+                .playlist img { width: 84px; aspect-ratio: 16 / 9; object-fit: cover; background: #000; border-radius: 10px; flex-shrink: 0; }
+                .playlist span { font-size: 13px; word-break: break-word; }
+                @media (max-width: 760px) {
                   .main { flex-direction: column; }
-                  .playlist { width: 100%; max-height: 35vh; border-left: none; border-top: 1px solid #222; }
+                  .playlist { width: 100%; max-height: 38vh; border-left: none; border-top: 1px solid var(--line); }
                 }
               </style>
             </head>
@@ -1308,8 +1340,11 @@ class MediaHttpServer(
                 :root { --accent: $accentColorHex; }
                 * { box-sizing: border-box; }
                 body {
-                  margin: 0; padding: 24px; background: #111319; color: #eee;
+                  margin: 0 auto; max-width: 1120px;
+                  padding: max(20px, env(safe-area-inset-top)) clamp(16px, 4vw, 40px) 24px;
+                  background: #121218; color: #e5e1e9;
                   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                  -webkit-font-smoothing: antialiased;
                 }
                 /* Set on <body> only while a video is selected (see the controlPanel below) — the
                    panel is fixed/floating, so without this the bottom of the folder/video grid
@@ -1322,10 +1357,12 @@ class MediaHttpServer(
                    browsing for the next video to pick. */
                 .controlPanel {
                   position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
-                  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-                  background: #181b24; border-top: 1px solid #262a36;
-                  box-shadow: 0 -6px 20px rgba(0, 0, 0, 0.4);
+                  padding: 14px clamp(16px, 4vw, 40px) calc(14px + env(safe-area-inset-bottom));
+                  background: rgba(24, 27, 36, 0.92); backdrop-filter: blur(12px);
+                  border-top: 1px solid #262a36;
+                  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.45);
                 }
+                .controlPanel > * { max-width: 1040px; margin-left: auto; margin-right: auto; }
                 .nowPlayingCard {
                   display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 10px; margin-bottom: 8px;
                   background: #1c1f28; border-radius: 12px;

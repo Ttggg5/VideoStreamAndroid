@@ -3,5 +3,23 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="brand_primary">#4A5FFF</color>
-    <color name="text">#FFFFFFFF</color>
+    <color name="text">#FFE4E1E9</color>
+
+    <!-- Streaming start/stop accents (dark). -->
+    <color name="start">#5FC7A0</color>
+    <color name="stop">#E08C89</color>
+
+    <!-- Material 3 neutral surface ramp (dark) — mirrors values/colors.xml. -->
+    <color name="md_surface">#121218</color>
+    <color name="md_surface_container_lowest">#0C0C11</color>
+    <color name="md_surface_container_low">#1A1A20</color>
+    <color name="md_surface_container">#1E1E25</color>
+    <color name="md_surface_container_high">#29282F</color>
+    <color name="md_surface_container_highest">#34333A</color>
+    <color name="md_surface_variant">#47464F</color>
+    <color name="md_on_surface">#E4E1E9</color>
+    <color name="md_on_surface_variant">#C8C5D0</color>
+    <color name="md_outline">#928F9A</color>
+    <color name="md_outline_variant">#47464F</color>
+    <color name="md_scrim">#99000000</color>
 </resources>

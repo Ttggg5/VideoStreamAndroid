@@ -2,180 +2,274 @@
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="?attr/colorSurface"
+    android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="@dimen/screen_horizontal_margin">
+        android:paddingHorizontal="@dimen/screen_horizontal_margin"
+        android:paddingTop="16dp"
+        android:paddingBottom="32dp">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
             android:text="@string/settings"
-            android:textSize="24sp"
+            android:textAppearance="?attr/textAppearanceHeadlineMedium"
+            android:textColor="?attr/colorOnSurface"
             android:textStyle="bold" />
 
+        <!-- Appearance group -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="28dp"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="10dp"
             android:text="@string/settings_accent_color"
-            android:textSize="15sp"
-            android:textStyle="bold" />
+            android:textAppearance="@style/TextAppearance.App.SectionLabel" />
 
-        <LinearLayout
-            android:id="@+id/accentColorRow"
+        <com.google.android.material.card.MaterialCardView
+            style="@style/Widget.App.Card"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:orientation="horizontal" />
+            app:cardBackgroundColor="?attr/colorSurfaceContainer"
+            app:cardCornerRadius="24dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <LinearLayout
+                    android:id="@+id/accentColorRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal" />
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="10dp"
             android:text="@string/settings_theme"
-            android:textSize="15sp"
-            android:textStyle="bold" />
+            android:textAppearance="@style/TextAppearance.App.SectionLabel" />
 
-        <RadioGroup
-            android:id="@+id/themeRadioGroup"
-            android:layout_width="wrap_content"
+        <com.google.android.material.card.MaterialCardView
+            style="@style/Widget.App.Card"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:orientation="vertical">
+            app:cardBackgroundColor="?attr/colorSurfaceContainer"
+            app:cardCornerRadius="24dp">
 
-            <RadioButton
-                android:id="@+id/themeSystemRadio"
-                android:layout_width="wrap_content"
+            <RadioGroup
+                android:id="@+id/themeRadioGroup"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/theme_system" />
+                android:orientation="vertical"
+                android:padding="8dp">
 
-            <RadioButton
-                android:id="@+id/themeLightRadio"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/theme_light" />
+                <RadioButton
+                    android:id="@+id/themeSystemRadio"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:text="@string/theme_system" />
 
-            <RadioButton
-                android:id="@+id/themeDarkRadio"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/theme_dark" />
+                <RadioButton
+                    android:id="@+id/themeLightRadio"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:text="@string/theme_light" />
 
-        </RadioGroup>
+                <RadioButton
+                    android:id="@+id/themeDarkRadio"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="48dp"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:text="@string/theme_dark" />
 
+            </RadioGroup>
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Streaming group -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="10dp"
             android:text="@string/settings_port"
-            android:textSize="15sp"
-            android:textStyle="bold" />
+            android:textAppearance="@style/TextAppearance.App.SectionLabel" />
 
-        <com.google.android.material.textfield.TextInputLayout
+        <com.google.android.material.card.MaterialCardView
+            style="@style/Widget.App.Card"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:hint="@string/settings_port_hint">
+            app:cardBackgroundColor="?attr/colorSurfaceContainer"
+            app:cardCornerRadius="24dp">
 
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/portInput"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="number"
-                android:maxLength="5" />
+                android:orientation="vertical"
+                android:padding="16dp">
 
-        </com.google.android.material.textfield.TextInputLayout>
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/settings_port_hint">
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="@string/settings_port_helper"
-            android:textColor="?android:attr/textColorSecondary"
-            android:textSize="12sp" />
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/portInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="number"
+                        android:maxLength="5" />
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+                </com.google.android.material.textfield.TextInputLayout>
 
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/settings_keep_screen_on" />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/settings_port_helper"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="12sp" />
 
-            <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/keepScreenOnSwitch"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:layout_marginBottom="4dp"
+                    android:text="@string/settings_skip_seconds"
+                    android:textColor="?attr/colorOnSurface"
+                    android:textStyle="bold" />
 
-        </LinearLayout>
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/settings_skip_seconds_hint">
 
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/skipSecondsInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="number"
+                        android:maxLength="3" />
+
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:text="@string/settings_skip_seconds_helper"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="12sp" />
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Playback group -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
-            android:text="@string/settings_skip_seconds"
-            android:textSize="15sp"
-            android:textStyle="bold" />
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="10dp"
+            android:text="@string/settings_playback"
+            android:textAppearance="@style/TextAppearance.App.SectionLabel" />
 
-        <com.google.android.material.textfield.TextInputLayout
+        <com.google.android.material.card.MaterialCardView
+            style="@style/Widget.App.Card"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:hint="@string/settings_skip_seconds_hint">
+            app:cardBackgroundColor="?attr/colorSurfaceContainer"
+            app:cardCornerRadius="24dp">
 
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/skipSecondsInput"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="number"
-                android:maxLength="3" />
+                android:orientation="vertical"
+                android:paddingHorizontal="18dp"
+                android:paddingVertical="6dp">
 
-        </com.google.android.material.textfield.TextInputLayout>
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:minHeight="56dp"
+                    android:orientation="horizontal">
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="@string/settings_skip_seconds_helper"
-            android:textColor="?android:attr/textColorSecondary"
-            android:textSize="12sp" />
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/settings_keep_screen_on"
+                        android:textColor="?attr/colorOnSurface" />
 
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/keepScreenOnSwitch"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
 
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="@string/settings_vibrate_on_control" />
+                </LinearLayout>
 
-            <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/vibrateOnControlSwitch"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content" />
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="?attr/colorOutlineVariant" />
 
-        </LinearLayout>
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:minHeight="56dp"
+                    android:orientation="horizontal">
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="@string/settings_vibrate_on_control_helper"
-            android:textColor="?android:attr/textColorSecondary"
-            android:textSize="12sp" />
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/settings_vibrate_on_control"
+                        android:textColor="?attr/colorOnSurface" />
+
+                    <com.google.android.material.materialswitch.MaterialSwitch
+                        android:id="@+id/vibrateOnControlSwitch"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
+
+                </LinearLayout>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="10dp"
+                    android:text="@string/settings_vibrate_on_control_helper"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="12sp" />
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
 
     </LinearLayout>
 

@@ -9,6 +9,9 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- So the embedded /remote WebView's navigator.vibrate() can buzz on a control-button
+         press when the "Vibrate on control" setting is on. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <!-- Neither is actually required: the app works fine without a touchscreen (D-pad/remote
          navigation) and without the leanback UI framework (no leanback widgets are used, but

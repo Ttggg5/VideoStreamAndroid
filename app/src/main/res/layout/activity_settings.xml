@@ -149,6 +149,34 @@
             android:textColor="?android:attr/textColorSecondary"
             android:textSize="12sp" />
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="@string/settings_vibrate_on_control" />
+
+            <com.google.android.material.materialswitch.MaterialSwitch
+                android:id="@+id/vibrateOnControlSwitch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="@string/settings_vibrate_on_control_helper"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="12sp" />
+
     </LinearLayout>
 
 </ScrollView>

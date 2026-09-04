@@ -231,8 +231,10 @@ class StreamingService : Service() {
         val port = AppSettings.getHttpPort(this)
         val accentHex = AppSettings.getAccentColor(this).hex
         val skipSeconds = AppSettings.getSkipSeconds(this)
+        val vibrateOnControl = AppSettings.getVibrateOnControl(this)
         val httpServer = MediaHttpServer(
-            port, contentResolver, assets, entries, libraryLabel, isFolderMode, defaultSort, accentHex, skipSeconds
+            port, contentResolver, assets, entries, libraryLabel, isFolderMode, defaultSort, accentHex,
+            skipSeconds, vibrateOnControl
         )
         try {
             httpServer.start(NANOHTTPD_TIMEOUT_MS, false)

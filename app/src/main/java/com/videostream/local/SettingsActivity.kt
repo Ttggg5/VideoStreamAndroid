@@ -57,6 +57,11 @@ class SettingsActivity : BaseActivity() {
         binding.skipSecondsInput.setOnFocusChangeListener { _, hasFocus ->
             if (!hasFocus) commitSkipSeconds()
         }
+
+        binding.vibrateOnControlSwitch.isChecked = AppSettings.getVibrateOnControl(this)
+        binding.vibrateOnControlSwitch.setOnCheckedChangeListener { _, isChecked ->
+            AppSettings.setVibrateOnControl(this, isChecked)
+        }
     }
 
     override fun onPause() {

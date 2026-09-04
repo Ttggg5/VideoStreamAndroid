@@ -44,11 +44,12 @@ class MediaHttpServerTest {
         isFolderMode: Boolean,
         libraryName: String = "Library",
         defaultSort: String = "name",
-        skipSeconds: Int = 10
+        skipSeconds: Int = 10,
+        vibrateOnControl: Boolean = true
     ): MediaHttpServer {
         val httpServer = MediaHttpServer(
             0, contentResolver, assetManager, entries, libraryName, isFolderMode, defaultSort,
-            skipSeconds = skipSeconds
+            skipSeconds = skipSeconds, vibrateOnControl = vibrateOnControl
         )
         httpServer.start(5000, false)
         server = httpServer
@@ -364,6 +365,30 @@ class MediaHttpServerTest {
 
         assertTrue("the JS should skip by the configured interval", body.contains("var skipSeconds = 30;"))
         assertTrue("the button should show the configured interval", body.contains("Skip forward 30 seconds"))
+    }
+
+    @Test
+    fun `remote control panel vibrates on button press when the setting is on`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true, vibrateOnControl = true)
+        post(httpServer, "/remote/select?id=1")
+
+        val (_, body) = get(httpServer, "/remote")
+
+        assertTrue("the vibrate flag should reach the page", body.contains("var vibrateOnControl = true;"))
+        assertTrue("the control buttons should buzz", body.contains("buzz()"))
+        assertTrue("buzz should use the Web Vibration API", body.contains("navigator.vibrate"))
+    }
+
+    @Test
+    fun `remote control panel does not vibrate when the setting is off`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true, vibrateOnControl = false)
+        post(httpServer, "/remote/select?id=1")
+
+        val (_, body) = get(httpServer, "/remote")
+
+        assertTrue("the vibrate flag should be off", body.contains("var vibrateOnControl = false;"))
     }
 
     @Test

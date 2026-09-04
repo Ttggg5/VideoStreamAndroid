@@ -74,7 +74,11 @@ with a built-in screen to open another device's stream.
   something else. With **Autoplay** on, reaching the end of a video
   advances everyone to the next one (or, with **Random** on, a random
   one); the skip buttons jump by the **Skip interval** set in Settings
-  (which also drives the native player's rewind/fast-forward buttons). The controls drive whatever's currently picked but never
+  (which also drives the native player's rewind/fast-forward buttons). The
+  control buttons are sized large for easy tapping, and — with **Vibrate on
+  control button** enabled in Settings — give a short haptic buzz on each
+  press (via the Web Vibration API, where the browser/WebView supports it).
+  The controls drive whatever's currently picked but never
   show the video picture itself, and stay muted — the video decodes in the
   background just enough to drive a real seek bar/duration, since this
   device is controlling the stream, not watching it. Previous/Next step
@@ -155,8 +159,10 @@ with a built-in screen to open another device's stream.
   screen — including the `--accent` color on the browse/watch web
   pages), **Theme** (match system / light / dark), **Streaming port**
   (default `8080`, used both when hosting and as the default port when
-  connecting to an address that doesn't specify one), and **Keep screen
-  on while watching**.
+  connecting to an address that doesn't specify one), **Keep screen
+  on while watching**, **Skip interval** (how far skip-back/forward jumps,
+  1–300s), and **Vibrate on control button** (a short buzz when pressing a
+  Remote Control button, on by default).
 
 Any modern browser plays the stream directly with a `<video>` tag —
 no app or plugin needed on the viewing device. Desktop media players like
@@ -282,7 +288,7 @@ app/src/main/java/com/videostream/local/
   BrowseAdapter.kt         RecyclerView adapter mixing folder and video cells (same thumbnail-tile card style) for WatchActivity's browse screen
   ThumbnailLoader.kt       Loads a host's /thumbnail?id=… images into ImageViews with a small in-memory cache
   RemoteControlActivity.kt   Thin WebView wrapper around this device's own /remote page (host-side control panel)
-  SettingsActivity.kt      Accent color / theme / streaming port / keep-screen-on
+  SettingsActivity.kt      Accent color / theme / streaming port / keep-screen-on / skip interval / vibrate on control
   BaseActivity.kt          Applies the saved accent color to every screen, recreating it if changed
   AppSettings.kt           SharedPreferences-backed store for all Settings values
   VideoStreamApplication.kt   Applies the saved light/dark mode on process start

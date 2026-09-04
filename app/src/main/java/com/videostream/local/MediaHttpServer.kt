@@ -59,7 +59,10 @@ class MediaHttpServer(
      *  CSS variable on the browse/watch pages, so a viewer's browser matches the host app's look. */
     private val accentColorHex: String = "#4A5FFF",
     /** The host's Settings > Skip interval, in seconds; how far `/remote`'s skip buttons jump. */
-    private val skipSeconds: Int = 10
+    private val skipSeconds: Int = 10,
+    /** The host's Settings > Vibrate on control choice; when true, `/remote`'s control buttons
+     *  buzz via the Web Vibration API (where the browser/WebView supports it) on each press. */
+    private val vibrateOnControl: Boolean = true
 ) : NanoWSD(port) {
 
     // Keyed by VideoEntry.id. An empty array means extraction was already tried and failed,
@@ -1367,26 +1370,26 @@ class MediaHttpServer(
                   display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%;
                 }
                 .ctrlButton {
-                  flex-shrink: 0; width: 60px; height: 60px; border-radius: 50%; border: none; cursor: pointer;
+                  flex-shrink: 0; width: 76px; height: 76px; border-radius: 50%; border: none; cursor: pointer;
                   background: var(--accent); color: #fff; font-size: 15px; line-height: 1;
                   display: flex; align-items: center; justify-content: center;
                 }
-                .ctrlButton svg { width: 46px; height: 46px; }
+                .ctrlButton svg { width: 58px; height: 58px; }
                 .ctrlButton:hover { opacity: 0.85; }
-                .ctrlButton.navButton { background: #262a36; width: 48px; height: 48px; }
+                .ctrlButton.navButton { background: #262a36; width: 60px; height: 60px; }
                 .ctrlButton.navButton:hover { background: #333846; }
-                .ctrlButton.navButton svg { width: 26px; height: 26px; }
+                .ctrlButton.navButton svg { width: 32px; height: 32px; }
                 /* Skip buttons pair a circular replay/forward arrow with the seconds count
                    overlaid in its hollow centre, so the exact jump size is visible on the button. */
                 .skipButton { position: relative; }
-                .ctrlButton.skipButton.navButton svg { width: 30px; height: 30px; }
+                .ctrlButton.skipButton.navButton svg { width: 38px; height: 38px; }
                 .skipNum {
                   position: absolute; top: 50%; left: 50%; transform: translate(-50%, -42%);
-                  font-size: 12px; font-weight: 700; line-height: 1; pointer-events: none;
+                  font-size: 14px; font-weight: 700; line-height: 1; pointer-events: none;
                 }
                 .ctrlButton:disabled { opacity: 0.35; cursor: default; }
                 .ctrlButton:disabled:hover { background: #262a36; }
-                .timeLabel { flex-shrink: 0; width: 42px; font-size: 13px; color: #ccc; text-align: center; }
+                .timeLabel { flex-shrink: 0; width: 46px; font-size: 14px; color: #ccc; text-align: center; }
                 .seekBar { flex: 1; accent-color: var(--accent); cursor: pointer; }
                 .placeholder { margin: 0 0 20px; padding: 32px; text-align: center; color: #888; background: #1c1f28; border-radius: 12px; }
                 .bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; font-size: 13px; }
@@ -1463,6 +1466,14 @@ class MediaHttpServer(
                 var shuffleMode = loadPref('remoteShuffleMode', false);
                 var autoplayNext = loadPref('remoteAutoplay', true);
                 var skipSeconds = $skipSeconds;
+                // Short haptic tick on each control-button press, when the host enabled it in
+                // Settings and the browser/WebView actually supports the Web Vibration API.
+                var vibrateOnControl = $vibrateOnControl;
+                function buzz() {
+                  if (vibrateOnControl && navigator.vibrate) {
+                    try { navigator.vibrate(15); } catch (e) {}
+                  }
+                }
 
                 // Every /remote/select reloads this whole page (see below), so there's no
                 // in-page state to keep a shuffle "bag" in between picks — a fresh uniformly
@@ -1550,6 +1561,7 @@ class MediaHttpServer(
                   });
 
                   playPauseButton.addEventListener('click', function () {
+                    buzz();
                     if (player.paused) player.play().catch(function () {}); else player.pause();
                   });
 
@@ -1568,6 +1580,7 @@ class MediaHttpServer(
                 var cards = document.querySelectorAll('.videoCard');
                 for (var i = 0; i < cards.length; i++) {
                   cards[i].addEventListener('click', function () {
+                    buzz();
                     selectVideo(parseInt(this.getAttribute('data-id'), 10));
                   });
                 }
@@ -1576,6 +1589,7 @@ class MediaHttpServer(
                 var takeControlButton = document.getElementById('takeControlButton');
                 if (takeControlButton) {
                   takeControlButton.addEventListener('click', function () {
+                    buzz();
                     selectVideo(parseInt(takeControlButton.getAttribute('data-id'), 10));
                   });
                 }
@@ -1589,12 +1603,14 @@ class MediaHttpServer(
                 }
                 if (prevButton) {
                   prevButton.addEventListener('click', function () {
+                    buzz();
                     var id = prevVideoId();
                     if (id !== null) selectVideo(id);
                   });
                 }
                 if (nextButton) {
                   nextButton.addEventListener('click', function () {
+                    buzz();
                     var id = nextVideoId();
                     if (id !== null) selectVideo(id);
                   });
@@ -1632,15 +1648,16 @@ class MediaHttpServer(
                 var skipBackButton = document.getElementById('skipBackButton');
                 var skipForwardButton = document.getElementById('skipForwardButton');
                 if (skipBackButton) {
-                  skipBackButton.addEventListener('click', function () { skipBy(-skipSeconds); });
+                  skipBackButton.addEventListener('click', function () { buzz(); skipBy(-skipSeconds); });
                 }
                 if (skipForwardButton) {
-                  skipForwardButton.addEventListener('click', function () { skipBy(skipSeconds); });
+                  skipForwardButton.addEventListener('click', function () { buzz(); skipBy(skipSeconds); });
                 }
 
                 var exitButton = document.getElementById('exitRemoteButton');
                 if (exitButton) {
                   exitButton.addEventListener('click', function () {
+                    buzz();
                     fetch('/remote/clear', { method: 'POST' }).then(function () {
                       location.reload();
                     }).catch(function () {});

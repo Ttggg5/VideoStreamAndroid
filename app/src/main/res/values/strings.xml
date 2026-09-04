@@ -80,4 +80,6 @@
     <string name="settings_skip_seconds">Skip interval</string>
     <string name="settings_skip_seconds_hint">Seconds (1–300)</string>
     <string name="settings_skip_seconds_helper">How far the skip-back and skip-forward buttons jump, in the player and in remote control.</string>
+    <string name="settings_vibrate_on_control">Vibrate on control button</string>
+    <string name="settings_vibrate_on_control_helper">Give a short buzz when you press a button on the Remote Control screen. Applies the next time you start streaming.</string>
 </resources>

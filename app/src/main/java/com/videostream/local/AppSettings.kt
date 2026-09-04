@@ -20,6 +20,7 @@ object AppSettings {
     private const val KEY_KEEP_SCREEN_ON = "keep_screen_on_watching"
     private const val KEY_BATTERY_OPT_PROMPT_DISMISSED = "battery_opt_prompt_dismissed"
     private const val KEY_SKIP_SECONDS = "skip_seconds"
+    private const val KEY_VIBRATE_ON_CONTROL = "vibrate_on_control"
 
     const val DEFAULT_HTTP_PORT = 8080
     const val MIN_HTTP_PORT = 1024
@@ -111,5 +112,14 @@ object AppSettings {
     fun setSkipSeconds(context: Context, seconds: Int) {
         val clamped = seconds.coerceIn(MIN_SKIP_SECONDS, MAX_SKIP_SECONDS)
         prefs(context).edit().putInt(KEY_SKIP_SECONDS, clamped).apply()
+    }
+
+    /** Whether the /remote control panel buzzes (navigator.vibrate) when a control button
+     *  is pressed. Read once when the stream starts and baked into the served page. */
+    fun getVibrateOnControl(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_VIBRATE_ON_CONTROL, true)
+
+    fun setVibrateOnControl(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_VIBRATE_ON_CONTROL, enabled).apply()
     }
 }

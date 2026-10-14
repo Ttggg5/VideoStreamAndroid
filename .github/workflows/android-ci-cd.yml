@@ -24,8 +24,18 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      # The runner image already ships an Android SDK; we just accept licenses and make sure
+      # the packages this build needs are present. Done manually rather than via
+      # android-actions/setup-android, which on current runners tries to install the long-removed
+      # legacy "tools" package and fails ("Failed to find package 'tools'").
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        run: |
+          set -e
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          SDKMGR="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager -path '*/bin/*' | sort | tail -n1)"
+          echo "Using sdkmanager: $SDKMGR (SDK root: $SDK_ROOT)"
+          yes | "$SDKMGR" --sdk_root="$SDK_ROOT" --licenses > /dev/null 2>&1 || true
+          "$SDKMGR" --sdk_root="$SDK_ROOT" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
       # Installs a real Gradle distribution and runs it directly, instead of relying on
       # a committed gradle-wrapper.jar (this repo intentionally doesn't ship a wrapper
@@ -87,8 +97,18 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      # The runner image already ships an Android SDK; we just accept licenses and make sure
+      # the packages this build needs are present. Done manually rather than via
+      # android-actions/setup-android, which on current runners tries to install the long-removed
+      # legacy "tools" package and fails ("Failed to find package 'tools'").
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        run: |
+          set -e
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          SDKMGR="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager -path '*/bin/*' | sort | tail -n1)"
+          echo "Using sdkmanager: $SDKMGR (SDK root: $SDK_ROOT)"
+          yes | "$SDKMGR" --sdk_root="$SDK_ROOT" --licenses > /dev/null 2>&1 || true
+          "$SDKMGR" --sdk_root="$SDK_ROOT" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4

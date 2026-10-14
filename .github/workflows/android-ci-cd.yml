@@ -47,6 +47,31 @@ jobs:
           name: app-debug
           path: app/build/outputs/apk/debug/*.apk
 
+      # Also produce an installable release build on every run (not just on tags). When no
+      # KEYSTORE_BASE64 secret is set, app/build.gradle.kts signs it with the debug key, so
+      # this works with no secrets; set the keystore secrets to get a properly-signed APK.
+      - name: Decode release keystore (optional)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$GITHUB_WORKSPACE/release.keystore"
+          fi
+
+      - name: Build release APK
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/release.keystore
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: gradle assembleRelease --stacktrace
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: app/build/outputs/apk/release/*.apk
+
   release:
     name: Publish GitHub Release
     needs: build

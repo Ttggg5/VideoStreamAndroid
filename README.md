@@ -367,9 +367,11 @@ built-in playlist/autoplay/shuffle support.
 
 `.github/workflows/android-ci-cd.yml` runs on GitHub Actions:
 
-- **Every push and pull request**: runs unit tests and builds a debug APK,
-  uploaded as a workflow artifact (visible on the Actions run page under
-  "Artifacts") — this is the CI gate.
+- **Every push and pull request**: runs unit tests and builds **both** a
+  debug APK and a release APK, each uploaded as a workflow artifact
+  (`app-debug` and `app-release`, visible on the Actions run page under
+  "Artifacts") — this is the CI gate. The release APK is signed with the
+  debug key unless the keystore secrets below are set.
 - **Pushing a tag matching `v*.*.*`** (e.g. `v1.0.0`): additionally builds
   a release APK and publishes it to a new [GitHub Release](../../releases)
   with the APK attached — this is the CD/publish step.

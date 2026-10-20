@@ -30,16 +30,31 @@ object AppSettings {
     const val MIN_SKIP_SECONDS = 1
     const val MAX_SKIP_SECONDS = 300
 
-    enum class AccentColor(val id: String, val hex: String, val themeOverlayRes: Int, val labelRes: Int) {
-        INDIGO("indigo", "#4A5FFF", R.style.ThemeOverlay_Accent_Indigo, R.string.accent_indigo),
-        TEAL("teal", "#00BFA5", R.style.ThemeOverlay_Accent_Teal, R.string.accent_teal),
-        PURPLE("purple", "#9C27B0", R.style.ThemeOverlay_Accent_Purple, R.string.accent_purple),
-        GREEN("green", "#43A047", R.style.ThemeOverlay_Accent_Green, R.string.accent_green),
-        ORANGE("orange", "#FB8C00", R.style.ThemeOverlay_Accent_Orange, R.string.accent_orange),
-        ROSE("rose", "#E91E63", R.style.ThemeOverlay_Accent_Rose, R.string.accent_rose);
+    /**
+     * Gradient themes (Settings > Theme). Each recolors the whole app (via its ThemeOverlay,
+     * which sets colorPrimary/colorSecondary to the two gradient stops) and the served web
+     * pages (StreamingService passes both stops to MediaHttpServer). [hex] is the start stop,
+     * kept for callers that only need a single representative color.
+     */
+    enum class AccentColor(
+        val id: String,
+        val startHex: String,
+        val endHex: String,
+        val themeOverlayRes: Int,
+        val labelRes: Int
+    ) {
+        AURORA("aurora", "#7C4DFF", "#FF4FA3", R.style.ThemeOverlay_Accent_Aurora, R.string.accent_aurora),
+        OCEAN("ocean", "#2F7BFF", "#00D2FF", R.style.ThemeOverlay_Accent_Ocean, R.string.accent_ocean),
+        SUNSET("sunset", "#FF8A3D", "#FF3D7F", R.style.ThemeOverlay_Accent_Sunset, R.string.accent_sunset),
+        EMERALD("emerald", "#00C9A7", "#7BE36A", R.style.ThemeOverlay_Accent_Emerald, R.string.accent_emerald),
+        NEON("neon", "#00E5FF", "#B44DFF", R.style.ThemeOverlay_Accent_Neon, R.string.accent_neon),
+        EMBER("ember", "#FF4D4D", "#FFB03B", R.style.ThemeOverlay_Accent_Ember, R.string.accent_ember);
+
+        val hex: String get() = startHex
 
         companion object {
-            fun fromId(id: String?): AccentColor = entries.firstOrNull { it.id == id } ?: INDIGO
+            // Unknown/legacy ids (e.g. the old flat "indigo") fall back to the default theme.
+            fun fromId(id: String?): AccentColor = entries.firstOrNull { it.id == id } ?: AURORA
         }
     }
 
@@ -76,9 +91,10 @@ object AppSettings {
         AppCompatDelegate.setDefaultNightMode(mode.nightMode)
     }
 
-    /** Applies the saved light/dark mode; safe to call on every process start. */
+    /** The app is always dark (the cinematic design has no light variant), so this forces
+     *  night mode regardless of any older saved light/dark preference. Safe on every start. */
     fun applyThemeMode(context: Context) {
-        AppCompatDelegate.setDefaultNightMode(getThemeMode(context).nightMode)
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
     }
 
     fun getHttpPort(context: Context): Int =

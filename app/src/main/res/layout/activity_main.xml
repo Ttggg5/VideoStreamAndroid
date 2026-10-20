@@ -4,77 +4,81 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/colorSurface"
+    android:background="@drawable/bg_screen_glow"
     android:padding="@dimen/screen_horizontal_margin"
     tools:context=".MainActivity">
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/settingsButton"
-        style="@style/Widget.Material3.Button.IconButton.Filled.Tonal"
-        android:layout_width="48dp"
-        android:layout_height="48dp"
+        style="@style/Widget.Material3.Button.IconButton.Outlined"
+        android:layout_width="52dp"
+        android:layout_height="52dp"
         android:contentDescription="@string/settings"
         android:insetTop="0dp"
         android:insetBottom="0dp"
-        app:backgroundTint="?attr/colorSurfaceContainerHigh"
+        app:backgroundTint="@color/glass_fill_strong"
         app:icon="@drawable/ic_settings"
         app:iconGravity="textStart"
         app:iconPadding="0dp"
         app:iconSize="22dp"
-        app:iconTint="?attr/colorOnSurfaceVariant"
+        app:iconTint="?attr/colorOnSurface"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        app:layout_constraintTop_toTopOf="parent"
+        app:strokeColor="@color/glass_stroke" />
 
-    <!-- Hero: app mark + title + tagline, packed and centered in the space above the actions. -->
+    <!-- Hero: gradient app mark, greeting, big title and tagline. -->
     <LinearLayout
         android:id="@+id/heroGroup"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:gravity="center_horizontal"
         android:orientation="vertical"
         app:layout_constraintBottom_toTopOf="@id/buttonGroup"
-        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintWidth_max="520dp"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/settingsButton"
-        app:layout_constraintVertical_chainStyle="packed">
+        app:layout_constraintVertical_chainStyle="packed"
+        app:layout_constraintWidth_max="520dp">
 
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="76dp"
-            android:layout_height="76dp"
-            app:cardBackgroundColor="?attr/colorPrimary"
-            app:cardCornerRadius="26dp"
-            app:cardElevation="0dp">
+        <FrameLayout
+            android:layout_width="68dp"
+            android:layout_height="68dp"
+            android:background="@drawable/bg_brand_gradient_round"
+            android:elevation="8dp">
 
             <ImageView
-                android:layout_width="40dp"
-                android:layout_height="40dp"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
                 android:layout_gravity="center"
                 android:contentDescription="@null"
-                android:src="@drawable/ic_videocam"
+                android:src="@drawable/ic_play_arrow"
                 app:tint="@color/white" />
 
-        </com.google.android.material.card.MaterialCardView>
+        </FrameLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:text="@string/home_greeting"
+            android:textAppearance="@style/TextAppearance.App.SectionLabel"
+            android:textColor="?attr/colorSecondary" />
 
         <TextView
             android:id="@+id/titleText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:gravity="center"
+            android:layout_marginTop="6dp"
             android:text="@string/app_name"
-            android:textAppearance="?attr/textAppearanceHeadlineMedium"
-            android:textColor="?attr/colorOnSurface"
-            android:textStyle="bold" />
+            android:textAppearance="@style/TextAppearance.App.Display" />
 
         <TextView
             android:id="@+id/taglineText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:gravity="center"
+            android:layout_marginTop="12dp"
+            android:lineSpacingExtra="4dp"
             android:text="@string/app_tagline"
-            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:textAppearance="?attr/textAppearanceBodyLarge"
             android:textColor="?attr/colorOnSurfaceVariant" />
 
     </LinearLayout>
@@ -83,13 +87,13 @@
         android:id="@+id/buttonGroup"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginTop="40dp"
         android:orientation="vertical"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintWidth_max="520dp"
+        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/heroGroup"
-        app:layout_constraintVertical_chainStyle="packed">
+        app:layout_constraintWidth_max="520dp">
 
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/hostButton"
@@ -105,30 +109,29 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:gravity="center_vertical"
+                android:minHeight="104dp"
                 android:orientation="horizontal"
                 android:padding="20dp">
 
-                <com.google.android.material.card.MaterialCardView
-                    android:layout_width="52dp"
-                    android:layout_height="52dp"
-                    app:cardBackgroundColor="?attr/colorSurfaceContainerHighest"
-                    app:cardCornerRadius="18dp"
-                    app:cardElevation="0dp">
+                <FrameLayout
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:background="@drawable/bg_brand_gradient_round">
 
                     <ImageView
-                        android:layout_width="26dp"
-                        android:layout_height="26dp"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
                         android:layout_gravity="center"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_videocam"
-                        app:tint="?attr/colorPrimary" />
+                        app:tint="@color/white" />
 
-                </com.google.android.material.card.MaterialCardView>
+                </FrameLayout>
 
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp"
+                    android:layout_marginStart="18dp"
                     android:layout_weight="1"
                     android:orientation="vertical">
 
@@ -136,14 +139,14 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="@string/host_a_video"
-                        android:textAppearance="?attr/textAppearanceTitleMedium"
+                        android:textAppearance="?attr/textAppearanceTitleLarge"
                         android:textColor="?attr/colorOnSurface"
                         android:textStyle="bold" />
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
+                        android:layout_marginTop="4dp"
                         android:text="@string/host_a_video_subtitle"
                         android:textAppearance="?attr/textAppearanceBodyMedium"
                         android:textColor="?attr/colorOnSurfaceVariant" />
@@ -151,12 +154,12 @@
                 </LinearLayout>
 
                 <ImageView
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
                     android:layout_marginStart="8dp"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_arrow_forward"
-                    app:tint="?attr/colorOnSurfaceVariant" />
+                    app:tint="?attr/colorSecondary" />
 
             </LinearLayout>
 
@@ -177,30 +180,29 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:gravity="center_vertical"
+                android:minHeight="104dp"
                 android:orientation="horizontal"
                 android:padding="20dp">
 
-                <com.google.android.material.card.MaterialCardView
-                    android:layout_width="52dp"
-                    android:layout_height="52dp"
-                    app:cardBackgroundColor="?attr/colorSurfaceContainerHighest"
-                    app:cardCornerRadius="18dp"
-                    app:cardElevation="0dp">
+                <FrameLayout
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:background="@drawable/bg_brand_gradient_round">
 
                     <ImageView
-                        android:layout_width="26dp"
-                        android:layout_height="26dp"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
                         android:layout_gravity="center"
                         android:contentDescription="@null"
                         android:src="@drawable/ic_visibility"
-                        app:tint="?attr/colorPrimary" />
+                        app:tint="@color/white" />
 
-                </com.google.android.material.card.MaterialCardView>
+                </FrameLayout>
 
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="16dp"
+                    android:layout_marginStart="18dp"
                     android:layout_weight="1"
                     android:orientation="vertical">
 
@@ -208,14 +210,14 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="@string/watch_a_stream"
-                        android:textAppearance="?attr/textAppearanceTitleMedium"
+                        android:textAppearance="?attr/textAppearanceTitleLarge"
                         android:textColor="?attr/colorOnSurface"
                         android:textStyle="bold" />
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
+                        android:layout_marginTop="4dp"
                         android:text="@string/watch_a_stream_subtitle"
                         android:textAppearance="?attr/textAppearanceBodyMedium"
                         android:textColor="?attr/colorOnSurfaceVariant" />
@@ -223,12 +225,12 @@
                 </LinearLayout>
 
                 <ImageView
-                    android:layout_width="22dp"
-                    android:layout_height="22dp"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
                     android:layout_marginStart="8dp"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_arrow_forward"
-                    app:tint="?attr/colorOnSurfaceVariant" />
+                    app:tint="?attr/colorSecondary" />
 
             </LinearLayout>
 

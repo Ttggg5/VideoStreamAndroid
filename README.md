@@ -154,27 +154,26 @@ with a built-in screen to open another device's stream.
   rather than by recreating the screen, so a playing video keeps playing
   — same position, same instance — straight through the rotation instead
   of restarting.
-- **Settings**: a gear icon on the landing screen opens **Accent
-  color** (six presets, applied as a runtime `ThemeOverlay` to every
-  screen — including the `--accent` color on the browse/watch web
-  pages), **Theme** (match system / light / dark), **Streaming port**
-  (default `8080`, used both when hosting and as the default port when
-  connecting to an address that doesn't specify one), **Keep screen
-  on while watching**, **Skip interval** (how far skip-back/forward jumps,
-  1–300s), and **Vibrate on control button** (a short buzz when pressing a
-  Remote Control button, on by default).
-
-- **Look & adaptivity**: the UI follows **Material 3 Expressive** — a
-  neutral tonal surface ramp (accent-independent, so the accent overlay
-  only ever swaps `colorPrimary`), large expressive corners, and filled/
-  tonal pill buttons — defined once in `themes.xml` and reused across every
-  screen. Layouts adapt to large and foldable screens: the landing and Host
-  screens switch to a **two-pane** layout in landscape / when unfolded, and
-  content is width-capped and centered rather than stretched edge-to-edge
-  on a tablet or an unfolded inner display. The served web pages (browse /
-  watch / remote) are likewise responsive — centered max-width containers,
-  fluid `auto-fill` grids, and `clamp()`-based spacing — so they read well
-  from a phone up to a foldable's inner screen.
+- **Settings**: a gear icon on the landing screen opens **Theme** (six
+  gradient themes — Aurora, Ocean, Sunset, Emerald, Neon, Ember — applied as
+  a runtime `ThemeOverlay` that sets the two gradient stops, and passed to
+  the web pages as `--accent` / `--accent-2`), **Streaming port** (default
+  `8080`, used both when hosting and as the default port when connecting to
+  an address that doesn't specify one), **Skip interval** (how far
+  skip-back/forward jumps, 1–300s), **Keep screen on while watching**, and
+  **Vibrate on control button** (a short buzz when pressing a Remote Control
+  button, on by default).
+- **Look & adaptivity**: a **dark cinematic** design — a near-black canvas
+  with a soft glow in the active theme's colors, translucent "glass" cards
+  with hairline borders, and primary actions (the Host Start button, Connect,
+  Remote Control, play badges) filled with the theme's gradient. The app is
+  always dark, so there's no light/dark setting. One themed gradient drawable
+  (`bg_brand_gradient`, `?attr/colorPrimary` → `?attr/colorSecondary`) follows
+  whichever theme is active. Layouts adapt to large and foldable screens: Home
+  and Host switch to a **two-pane** layout in landscape / when unfolded. The
+  served web pages (browse / watch / remote) share the same look via a common
+  token stylesheet (`--grad`, glass surfaces, glow) and stay responsive —
+  centered max-width containers, fluid `auto-fill` grids, `clamp()` spacing.
 
 Any modern browser plays the stream directly with a `<video>` tag —
 no app or plugin needed on the viewing device. Desktop media players like
@@ -300,7 +299,7 @@ app/src/main/java/com/videostream/local/
   BrowseAdapter.kt         RecyclerView adapter mixing folder and video cells (same thumbnail-tile card style) for WatchActivity's browse screen
   ThumbnailLoader.kt       Loads a host's /thumbnail?id=… images into ImageViews with a small in-memory cache
   RemoteControlActivity.kt   Thin WebView wrapper around this device's own /remote page (host-side control panel)
-  SettingsActivity.kt      Accent color / theme / streaming port / keep-screen-on / skip interval / vibrate on control
+  SettingsActivity.kt      Gradient theme / streaming port / skip interval / keep-screen-on / vibrate on control
   BaseActivity.kt          Applies the saved accent color to every screen, recreating it if changed
   AppSettings.kt           SharedPreferences-backed store for all Settings values
   VideoStreamApplication.kt   Applies the saved light/dark mode on process start

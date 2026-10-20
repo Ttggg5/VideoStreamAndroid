@@ -45,11 +45,14 @@ class MediaHttpServerTest {
         libraryName: String = "Library",
         defaultSort: String = "name",
         skipSeconds: Int = 10,
-        vibrateOnControl: Boolean = true
+        vibrateOnControl: Boolean = true,
+        accentStart: String = "#7C4DFF",
+        accentEnd: String = "#FF4FA3"
     ): MediaHttpServer {
         val httpServer = MediaHttpServer(
             0, contentResolver, assetManager, entries, libraryName, isFolderMode, defaultSort,
-            skipSeconds = skipSeconds, vibrateOnControl = vibrateOnControl
+            accentColorHex = accentStart, skipSeconds = skipSeconds, vibrateOnControl = vibrateOnControl,
+            accentColorEndHex = accentEnd
         )
         httpServer.start(5000, false)
         server = httpServer
@@ -378,6 +381,21 @@ class MediaHttpServerTest {
         assertTrue("the vibrate flag should reach the page", body.contains("var vibrateOnControl = true;"))
         assertTrue("the control buttons should buzz", body.contains("buzz()"))
         assertTrue("buzz should use the Web Vibration API", body.contains("navigator.vibrate"))
+    }
+
+    @Test
+    fun `the host's gradient theme reaches the browse and remote pages`() {
+        val entries = listOf(VideoEntry(id = 1, name = "only.mp4", folderPath = "", uri = fakeUri()))
+        val httpServer = startServer(entries, isFolderMode = true, accentStart = "#2F7BFF", accentEnd = "#00D2FF")
+
+        val (_, browse) = get(httpServer, "/browse")
+        val (_, remote) = get(httpServer, "/remote")
+
+        for (body in listOf(browse, remote)) {
+            assertTrue("gradient start stop should be the --accent var", body.contains("--accent: #2F7BFF;"))
+            assertTrue("gradient end stop should be the --accent-2 var", body.contains("--accent-2: #00D2FF;"))
+            assertTrue("pages should build the brand gradient from both stops", body.contains("--grad: linear-gradient"))
+        }
     }
 
     @Test

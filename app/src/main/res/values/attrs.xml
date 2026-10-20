@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Low-alpha versions of the active gradient theme's two colors, used for the soft
+         background glow on every screen (set per theme in ThemeOverlay.Accent.*). -->
+    <attr name="brandGlowPrimary" format="color" />
+    <attr name="brandGlowSecondary" format="color" />
+</resources>

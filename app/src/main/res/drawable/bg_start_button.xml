@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Host Start/Stop button: glowing brand-gradient circle, or a dim glass circle while there's
+     nothing selected to stream (HostActivity only toggles isEnabled + the icon). -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_enabled="false">
+        <layer-list>
+            <item android:bottom="10dp" android:left="10dp" android:right="10dp" android:top="10dp">
+                <shape android:shape="oval">
+                    <solid android:color="@color/glass_fill_strong" />
+                    <stroke android:width="1dp" android:color="@color/glass_stroke" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item android:drawable="@drawable/bg_brand_gradient_oval" />
+</selector>

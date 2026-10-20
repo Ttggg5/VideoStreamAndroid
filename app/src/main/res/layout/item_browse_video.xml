@@ -4,7 +4,8 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="?attr/selectableItemBackground"
+    android:layout_margin="6dp"
+    android:background="@drawable/bg_grid_cell"
     android:clickable="true"
     android:focusable="true"
     android:padding="8dp">
@@ -13,45 +14,67 @@
         android:id="@+id/videoThumbnail"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginBottom="8dp"
         android:background="@drawable/bg_rounded_thumbnail"
         android:backgroundTint="#000000"
         android:clipToOutline="true"
         android:contentDescription="@null"
         android:scaleType="centerCrop"
         app:layout_constraintDimensionRatio="16:9"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
         tools:layout_height="90dp" />
+
+    <!-- Gradient play chip tucked into the thumbnail's corner. -->
+    <FrameLayout
+        android:layout_width="30dp"
+        android:layout_height="30dp"
+        android:layout_margin="8dp"
+        android:background="@drawable/bg_brand_gradient"
+        android:elevation="2dp"
+        app:layout_constraintBottom_toBottomOf="@id/videoThumbnail"
+        app:layout_constraintEnd_toEndOf="@id/videoThumbnail">
+
+        <ImageView
+            android:layout_width="18dp"
+            android:layout_height="18dp"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            android:src="@drawable/ic_play_arrow"
+            app:tint="@color/white" />
+
+    </FrameLayout>
 
     <TextView
         android:id="@+id/videoTitle"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginHorizontal="4dp"
+        android:layout_marginTop="10dp"
         android:ellipsize="end"
         android:maxLines="2"
-        android:textAppearance="?attr/textAppearanceBodyMedium"
+        android:textAppearance="?attr/textAppearanceTitleSmall"
         android:textColor="?attr/colorOnSurface"
-        app:layout_constraintTop_toBottomOf="@id/videoThumbnail"
-        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/videoThumbnail"
         tools:text="A fairly long video file name.mp4" />
 
     <TextView
         android:id="@+id/videoSubtitle"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="1dp"
+        android:layout_marginHorizontal="4dp"
+        android:layout_marginTop="2dp"
         android:ellipsize="end"
         android:maxLines="1"
         android:textAppearance="?attr/textAppearanceLabelSmall"
-        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textColor="?attr/colorSecondary"
         android:visibility="gone"
-        app:layout_constraintTop_toBottomOf="@id/videoTitle"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/videoTitle"
         tools:text="Movies/Action"
         tools:visibility="visible" />
 

@@ -13,8 +13,8 @@
     <dimen name="space_xl">32dp</dimen>
 
     <!-- Settings > Accent color swatches. -->
-    <dimen name="accent_swatch_size">48dp</dimen>
-    <dimen name="accent_swatch_margin">12dp</dimen>
+    <dimen name="accent_swatch_size">54dp</dimen>
+    <dimen name="accent_swatch_margin">14dp</dimen>
 
     <!-- Corner radius for the browse grid's folder/video thumbnail tiles. -->
     <dimen name="browse_thumbnail_corner_radius">18dp</dimen>

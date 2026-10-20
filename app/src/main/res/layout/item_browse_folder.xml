@@ -4,33 +4,41 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="?attr/selectableItemBackground"
+    android:layout_margin="6dp"
+    android:background="@drawable/bg_grid_cell"
     android:clickable="true"
     android:focusable="true"
     android:padding="8dp">
 
-    <!-- Same 16:9 tile + title-below shape as item_browse_video's thumbnail, so folders and
-         videos read as one consistent grid instead of two different item styles. -->
+    <!-- Same 16:9 tile + title-below shape as item_browse_video, so folders and videos read
+         as one consistent grid. -->
     <FrameLayout
         android:id="@+id/folderThumbnail"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_marginBottom="8dp"
         android:background="@drawable/bg_rounded_thumbnail"
-        android:backgroundTint="?attr/colorSurfaceContainerHighest"
+        android:backgroundTint="@color/md_surface_container_high"
         android:clipToOutline="true"
         app:layout_constraintDimensionRatio="16:9"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintTop_toTopOf="parent">
 
-        <ImageView
-            android:layout_width="34dp"
-            android:layout_height="34dp"
+        <FrameLayout
+            android:layout_width="52dp"
+            android:layout_height="52dp"
             android:layout_gravity="center"
-            android:contentDescription="@null"
-            android:src="@drawable/ic_folder"
-            app:tint="?attr/colorPrimary" />
+            android:background="@drawable/bg_brand_gradient_round">
+
+            <ImageView
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_gravity="center"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_folder"
+                app:tint="@color/white" />
+
+        </FrameLayout>
 
     </FrameLayout>
 
@@ -38,13 +46,15 @@
         android:id="@+id/folderName"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
+        android:layout_marginHorizontal="4dp"
+        android:layout_marginTop="10dp"
         android:ellipsize="end"
         android:maxLines="2"
-        android:textAppearance="?attr/textAppearanceBodyMedium"
+        android:textAppearance="?attr/textAppearanceTitleSmall"
         android:textColor="?attr/colorOnSurface"
-        app:layout_constraintTop_toBottomOf="@id/folderThumbnail"
-        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/folderThumbnail"
         tools:text="Movies" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

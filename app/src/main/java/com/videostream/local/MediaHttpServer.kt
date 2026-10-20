@@ -57,12 +57,15 @@ class MediaHttpServer(
     private val defaultSortParam: String,
     /** The host's Settings > Accent color choice, as a "#RRGGBB" string; used as the `--accent`
      *  CSS variable on the browse/watch pages, so a viewer's browser matches the host app's look. */
-    private val accentColorHex: String = "#4A5FFF",
+    private val accentColorHex: String = "#7C4DFF",
     /** The host's Settings > Skip interval, in seconds; how far `/remote`'s skip buttons jump. */
     private val skipSeconds: Int = 10,
     /** The host's Settings > Vibrate on control choice; when true, `/remote`'s control buttons
      *  buzz via the Web Vibration API (where the browser/WebView supports it) on each press. */
-    private val vibrateOnControl: Boolean = true
+    private val vibrateOnControl: Boolean = true,
+    /** Second stop of the host's Settings > Theme gradient ([accentColorHex] is the first);
+     *  the pages render `--grad: linear-gradient(135deg, accent, accent-2)` from the pair. */
+    private val accentColorEndHex: String = "#FF4FA3"
 ) : NanoWSD(port) {
 
     // Keyed by VideoEntry.id. An empty array means extraction was already tried and failed,
@@ -121,6 +124,44 @@ class MediaHttpServer(
             }
         }.toMap()
     }
+
+    /**
+     * Shared design tokens for every served page (dark cinematic + gradient look), so browse /
+     * watch / remote all match the app. `--accent`/`--accent-2` are the host's Settings > Theme
+     * gradient stops; `--grad` is the gradient itself, `--glass*` the translucent card surfaces.
+     */
+    private val themeTokensCss: String
+        get() = """
+            :root {
+              --accent: $accentColorHex; --accent-2: $accentColorEndHex;
+              --grad: linear-gradient(135deg, var(--accent), var(--accent-2));
+              --bg: #0a0a12; --text: #f3f1fb; --muted: #a9a5be; --faint: #77738c;
+              --glass: rgba(23, 23, 36, 0.72); --glass-strong: rgba(28, 28, 43, 0.9);
+              --glass-hi: rgba(40, 40, 60, 0.85); --line: rgba(255, 255, 255, 0.10);
+              --glow: 0 8px 30px -6px color-mix(in srgb, var(--accent) 60%, transparent);
+              --radius-l: 28px; --radius-m: 22px;
+            }
+            * { box-sizing: border-box; }
+            html { background: var(--bg); }
+            body {
+              background:
+                radial-gradient(900px 520px at 0% -10%, color-mix(in srgb, var(--accent) 26%, transparent), transparent 70%),
+                radial-gradient(760px 480px at 100% 0%, color-mix(in srgb, var(--accent-2) 20%, transparent), transparent 70%),
+                var(--bg);
+              background-attachment: fixed;
+              color: var(--text);
+              font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+              -webkit-font-smoothing: antialiased;
+            }
+            .brand { display: flex; align-items: center; gap: 10px; margin: 4px 0 18px; color: var(--muted);
+              font-size: 13px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+            .brand .logo { width: 34px; height: 34px; border-radius: 11px; background: var(--grad);
+              display: flex; align-items: center; justify-content: center; color: #fff; box-shadow: var(--glow); }
+            .brand .logo svg { width: 20px; height: 20px; }
+        """
+
+    private val brandHeaderHtml: String
+        get() = "<header class=\"brand\"><span class=\"logo\">$playIconSvg</span>Local Video Stream</header>"
 
     // Small inline SVGs used across the browse/watch pages instead of emoji, so icons render
     // identically regardless of the viewing device's font/emoji set.
@@ -507,69 +548,70 @@ class MediaHttpServer(
               <meta name="viewport" content="width=device-width, initial-scale=1">
               <title>${escapeHtml(title)}</title>
               <style>
-                :root {
-                  --accent: $accentColorHex;
-                  --bg: #121218; --surface: #1e1e25; --surface-hi: #29282f;
-                  --text: #e5e1e9; --muted: #c8c5d0; --faint: #918f9a;
-                  --radius-l: 24px; --radius-m: 18px;
-                }
-                * { box-sizing: border-box; }
+                $themeTokensCss
                 body {
-                  margin: 0 auto; max-width: 1120px;
-                  padding: max(20px, env(safe-area-inset-top)) clamp(16px, 4vw, 40px) 40px;
-                  background: var(--bg); color: var(--text);
-                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                  -webkit-font-smoothing: antialiased;
+                  margin: 0 auto; max-width: 1180px; min-height: 100vh;
+                  padding: max(22px, env(safe-area-inset-top)) clamp(16px, 4vw, 44px) 48px;
                 }
                 h1 {
-                  font-size: clamp(22px, 5vw, 30px); font-weight: 700;
-                  margin: 8px 0 18px; letter-spacing: -0.02em;
+                  font-size: clamp(28px, 6vw, 44px); font-weight: 800;
+                  margin: 0 0 22px; letter-spacing: -0.03em; line-height: 1.05;
                 }
-                .bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; font-size: 14px; }
-                .bar .label { color: var(--faint); margin-right: 2px; }
+                .bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 20px; font-size: 14px; }
+                .bar .label { color: var(--faint); margin-right: 4px; font-weight: 600; }
                 .bar a, .bar .active {
-                  padding: 9px 18px; border-radius: 999px; text-decoration: none; font-size: 14px;
-                  transition: background 0.15s ease, color 0.15s ease;
+                  padding: 10px 18px; border-radius: 999px; text-decoration: none; font-size: 14px;
+                  border: 1px solid var(--line); transition: background 0.2s ease, transform 0.2s ease;
                 }
-                .bar a { color: var(--muted); background: var(--surface); }
-                .bar a:hover { background: var(--surface-hi); }
-                .bar .active { background: var(--accent); color: #fff; font-weight: 600; }
-                ul.folders { list-style: none; padding: 0; margin: 0 0 18px; display: grid; gap: 10px;
-                  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); }
+                .bar a { color: var(--muted); background: var(--glass); backdrop-filter: blur(14px); }
+                .bar a:hover { background: var(--glass-hi); color: var(--text); transform: translateY(-1px); }
+                .bar .active { background: var(--grad); color: #fff; font-weight: 700; border-color: transparent; box-shadow: var(--glow); }
+                ul.folders { list-style: none; padding: 0; margin: 0 0 24px; display: grid; gap: 12px;
+                  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
                 ul.folders li { margin: 0; }
                 ul.folders a {
-                  display: flex; align-items: center; gap: 12px; padding: 16px 18px;
-                  background: var(--surface); color: var(--text); text-decoration: none;
-                  border-radius: var(--radius-m); font-size: 15px;
-                  transition: background 0.15s ease, transform 0.15s ease;
+                  display: flex; align-items: center; gap: 14px; padding: 16px 18px;
+                  background: var(--glass); backdrop-filter: blur(14px); border: 1px solid var(--line);
+                  color: var(--text); text-decoration: none; border-radius: var(--radius-m);
+                  font-size: 15px; font-weight: 600; transition: background 0.2s ease, transform 0.2s ease;
                 }
-                ul.folders a:hover { background: var(--surface-hi); transform: translateY(-1px); }
+                ul.folders a svg { flex-shrink: 0; width: 22px; height: 22px; color: var(--accent-2); }
+                ul.folders a:hover { background: var(--glass-hi); transform: translateY(-2px); }
                 ul.folders a.back { color: var(--muted); }
                 ul.videos {
                   list-style: none; padding: 0; margin: 0; display: grid;
-                  grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr)); gap: 16px;
+                  grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr)); gap: 18px;
                 }
                 ul.videos a {
-                  display: flex; flex-direction: column; background: var(--surface); color: var(--text);
-                  text-decoration: none; border-radius: var(--radius-m); overflow: hidden;
-                  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+                  display: flex; flex-direction: column; color: var(--text); text-decoration: none;
+                  background: var(--glass); backdrop-filter: blur(14px); border: 1px solid var(--line);
+                  border-radius: var(--radius-m); overflow: hidden; padding: 8px;
+                  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
                 }
-                ul.videos a:hover {
-                  background: var(--surface-hi); transform: translateY(-3px);
-                  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35);
+                ul.videos a:hover, ul.videos a:focus-visible {
+                  transform: translateY(-4px); border-color: color-mix(in srgb, var(--accent-2) 55%, transparent);
+                  box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.7), var(--glow); outline: none;
                 }
-                ul.videos .thumb { display: block; position: relative; background: #000; }
-                ul.videos .thumb img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
+                ul.videos .thumb { display: block; position: relative; background: #000; border-radius: 16px; overflow: hidden; }
+                ul.videos .thumb img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; transition: transform 0.4s ease; }
+                ul.videos a:hover .thumb img { transform: scale(1.05); }
+                ul.videos .thumb::after { content: ""; position: absolute; inset: 0;
+                  background: linear-gradient(to top, rgba(0, 0, 0, 0.55), transparent 55%); }
                 ul.videos .play-badge {
-                  position: absolute; right: 8px; bottom: 8px; display: flex; color: #fff;
-                  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.7));
+                  position: absolute; right: 10px; bottom: 10px; z-index: 1; display: flex;
+                  width: 38px; height: 38px; border-radius: 50%; background: var(--grad); color: #fff;
+                  align-items: center; justify-content: center; box-shadow: var(--glow);
+                  transition: transform 0.25s ease;
                 }
-                ul.videos .title { display: block; padding: 11px 12px 4px; font-size: 14px; font-weight: 500; word-break: break-word; }
-                ul.videos small { display: block; padding: 0 12px 12px; color: var(--faint); font-size: 12px; word-break: break-word; }
-                ul.videos a .title:last-child { padding-bottom: 12px; }
+                ul.videos .play-badge svg { width: 24px; height: 24px; }
+                ul.videos a:hover .play-badge { transform: scale(1.12); }
+                ul.videos .title { display: block; padding: 12px 6px 4px; font-size: 14px; font-weight: 600; word-break: break-word; line-height: 1.35; }
+                ul.videos small { display: block; padding: 0 6px 8px; color: var(--accent-2); font-size: 12px; font-weight: 600; word-break: break-word; }
+                ul.videos a .title:last-child { padding-bottom: 8px; }
               </style>
             </head>
             <body>
+              $brandHeaderHtml
               <h1>${escapeHtml(title)}</h1>
               $viewBar
               <ul class="folders">
@@ -724,105 +766,81 @@ class MediaHttpServer(
               <title>${escapeHtml(entry.name)}</title>
               <link href="/assets/videojs/video-js.min.css" rel="stylesheet">
               <style>
-                :root {
-                  --accent: $accentColorHex;
-                  --bg: #121218; --surface: #1e1e25; --surface-hi: #29282f;
-                  --text: #e5e1e9; --muted: #c8c5d0; --line: rgba(255,255,255,0.08);
-                }
-                * { box-sizing: border-box; }
-                html, body {
-                  margin: 0; height: 100%; background: var(--bg); color: var(--text);
-                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                  -webkit-font-smoothing: antialiased;
-                }
+                $themeTokensCss
+                html, body { margin: 0; height: 100%; }
                 body { display: flex; flex-direction: column; }
                 .topbar {
-                  display: flex; align-items: center; gap: 14px; flex-shrink: 0; flex-wrap: wrap;
-                  padding: max(10px, env(safe-area-inset-top)) clamp(12px, 3vw, 20px) 10px;
+                  display: flex; align-items: center; gap: 12px; flex-shrink: 0; flex-wrap: wrap;
+                  padding: max(12px, env(safe-area-inset-top)) clamp(12px, 3vw, 24px) 12px;
+                  background: var(--glass); backdrop-filter: blur(18px); border-bottom: 1px solid var(--line);
                 }
                 .back {
                   display: flex; align-items: center; gap: 4px; color: var(--text); text-decoration: none;
-                  flex-shrink: 0; padding: 8px 14px 8px 10px; border-radius: 999px; background: var(--surface);
-                  transition: background 0.15s ease;
+                  flex-shrink: 0; padding: 9px 16px 9px 10px; border-radius: 999px; font-weight: 600;
+                  background: var(--glass-hi); border: 1px solid var(--line); transition: transform 0.2s ease;
                 }
-                .back:hover { background: var(--surface-hi); }
-                #currentTitle { font-size: 15px; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-                .controls { display: flex; gap: 10px; align-items: center; margin-left: auto; }
+                .back:hover { transform: translateX(-2px); }
+                #currentTitle { font-size: 16px; font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                .controls { display: flex; gap: 8px; align-items: center; margin-left: auto; }
                 .toggle {
-                  display: flex; align-items: center; gap: 6px; padding: 9px 15px; border-radius: 999px;
-                  background: var(--surface); font-size: 13px; color: var(--muted); white-space: nowrap; cursor: pointer;
-                  transition: background 0.15s ease, color 0.15s ease;
+                  display: flex; align-items: center; gap: 6px; padding: 9px 16px; border-radius: 999px;
+                  background: var(--glass-hi); border: 1px solid var(--line); font-size: 13px; font-weight: 600;
+                  color: var(--muted); white-space: nowrap; cursor: pointer; transition: all 0.2s ease;
                 }
-                .toggle:has(input:checked) { background: var(--accent); color: #fff; }
+                .toggle:has(input:checked) { background: var(--grad); color: #fff; border-color: transparent; box-shadow: var(--glow); }
                 .main { flex: 1; display: flex; min-height: 0; }
                 .player { flex: 1; background: #000; min-width: 0; }
                 .video-js { width: 100%; height: 100%; }
                 .video-js .vjs-tech { object-fit: contain; }
-                /* Re-skins video.js's default look (grey-blue box skin) to match this app's
-                   dark surfaces + accent color, reusing the same play-badge circle motif as
-                   the thumbnails on the browse page. */
+                /* Re-skins video.js's default box skin with the brand gradient + glass. */
                 .video-js .vjs-big-play-button {
-                  width: 64px; height: 64px; line-height: 64px;
-                  margin: -32px 0 0 -32px;
-                  font-size: 26px;
-                  border: none;
-                  border-radius: 50%;
-                  background-color: rgba(0, 0, 0, 0.55);
-                  transition: background-color 0.15s ease;
+                  width: 84px; height: 84px; line-height: 84px; margin: -42px 0 0 -42px;
+                  font-size: 34px; border: none; border-radius: 50%;
+                  background: var(--grad); box-shadow: var(--glow); transition: transform 0.2s ease;
                 }
                 .video-js:hover .vjs-big-play-button,
                 .video-js .vjs-big-play-button:focus,
-                .video-js .vjs-big-play-button:hover {
-                  border: none;
-                  background-color: var(--accent);
+                .video-js .vjs-big-play-button:hover { border: none; background: var(--grad); transform: scale(1.08); }
+                .video-js .vjs-control-bar {
+                  height: 3.6em; background: linear-gradient(to top, rgba(0, 0, 0, 0.85), rgba(0, 0, 0, 0.25));
                 }
-                .video-js .vjs-control-bar { background-color: rgba(17, 19, 25, 0.85); }
-                .video-js .vjs-slider { background-color: rgba(255, 255, 255, 0.15); }
-                .video-js .vjs-play-progress,
-                .video-js .vjs-volume-level {
-                  background-color: var(--accent);
-                }
-                .video-js .vjs-load-progress div { background: rgba(74, 95, 255, 0.35); }
+                .video-js .vjs-slider { background-color: rgba(255, 255, 255, 0.18); border-radius: 999px; }
+                .video-js .vjs-play-progress, .video-js .vjs-volume-level { background: var(--grad); border-radius: 999px; }
+                .video-js .vjs-load-progress div { background: rgba(255, 255, 255, 0.22); }
                 .video-js .vjs-control:focus:before,
-                .video-js .vjs-control:hover:before {
-                  text-shadow: 0 0 1em var(--accent);
-                }
-                .video-js .vjs-menu-content { background-color: #1c1f28; border-radius: 10px; overflow: hidden; }
+                .video-js .vjs-control:hover:before { text-shadow: 0 0 1em var(--accent-2); }
+                .video-js .vjs-menu-content { background-color: var(--glass-strong); border-radius: 14px; overflow: hidden; }
                 .video-js .vjs-menu-item:hover,
                 .video-js .vjs-menu li.vjs-menu-item:focus,
-                .video-js .vjs-menu li.vjs-menu-item:hover {
-                  background-color: rgba(74, 95, 255, 0.25);
-                }
+                .video-js .vjs-menu li.vjs-menu-item:hover { background-color: rgba(255, 255, 255, 0.1); }
                 .video-js .vjs-selected:hover,
                 .video-js .vjs-menu li.vjs-selected,
                 .video-js .vjs-menu li.vjs-selected:focus,
-                .video-js .vjs-menu li.vjs-selected:hover {
-                  background-color: var(--accent);
-                  color: #fff;
-                }
-                /* Prev/Next live inside video.js's own control bar (see navButtonsScript),
-                   right next to the play button, styled to match its other controls. */
-                .video-js .vjs-nav-button {
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                  cursor: pointer;
-                }
+                .video-js .vjs-menu li.vjs-selected:hover { background: var(--grad); color: #fff; }
+                /* Prev/Next live inside video.js's own control bar (see navButtonsScript). */
+                .video-js .vjs-nav-button { display: flex; align-items: center; justify-content: center; cursor: pointer; }
                 .video-js .vjs-nav-icon { font-size: 1.8em; line-height: 1; color: #fff; }
                 .video-js .vjs-nav-button:hover .vjs-nav-icon,
-                .video-js .vjs-nav-button:focus .vjs-nav-icon {
-                  color: var(--accent);
-                }
+                .video-js .vjs-nav-button:focus .vjs-nav-icon { color: var(--accent-2); }
                 .video-js .vjs-nav-button:disabled { cursor: default; opacity: 0.35; }
-                .playlist { width: 300px; flex-shrink: 0; overflow-y: auto; border-left: 1px solid var(--line); list-style: none; margin: 0; padding: 6px; }
-                .playlist li { display: flex; gap: 12px; align-items: center; padding: 8px; cursor: pointer; border-radius: 14px; margin: 4px 2px; transition: background 0.15s ease; }
-                .playlist li:hover { background: var(--surface); }
-                .playlist li.active { background: var(--surface-hi); box-shadow: inset 3px 0 0 var(--accent); }
-                .playlist img { width: 84px; aspect-ratio: 16 / 9; object-fit: cover; background: #000; border-radius: 10px; flex-shrink: 0; }
-                .playlist span { font-size: 13px; word-break: break-word; }
+                .playlist {
+                  width: 320px; flex-shrink: 0; overflow-y: auto; list-style: none; margin: 0; padding: 10px;
+                  background: var(--glass); backdrop-filter: blur(18px); border-left: 1px solid var(--line);
+                }
+                .playlist li {
+                  display: flex; gap: 12px; align-items: center; padding: 8px; cursor: pointer;
+                  border-radius: 16px; margin: 4px 0; border: 1px solid transparent; transition: background 0.2s ease;
+                }
+                .playlist li:hover { background: var(--glass-hi); }
+                .playlist li.active {
+                  background: var(--glass-hi); border-color: color-mix(in srgb, var(--accent-2) 55%, transparent);
+                  box-shadow: var(--glow);
+                }
+                .playlist img { width: 92px; aspect-ratio: 16 / 9; object-fit: cover; background: #000; border-radius: 12px; flex-shrink: 0; }
+                .playlist span { font-size: 13px; font-weight: 600; word-break: break-word; }
                 @media (max-width: 760px) {
                   .main { flex-direction: column; }
-                  .playlist { width: 100%; max-height: 38vh; border-left: none; border-top: 1px solid var(--line); }
+                  .playlist { width: 100%; max-height: 40vh; border-left: none; border-top: 1px solid var(--line); }
                 }
               </style>
             </head>
@@ -1057,8 +1075,9 @@ class MediaHttpServer(
                    screen forever, and offers one tap to restore sound. */
                 .unmuteButton {
                   display: none; position: fixed; right: 16px; bottom: 16px; z-index: 10;
-                  align-items: center; gap: 6px; padding: 10px 14px; border: none; border-radius: 999px;
-                  background: rgba(0, 0, 0, 0.65); color: #fff; font-size: 13px; cursor: pointer;
+                  align-items: center; gap: 8px; padding: 12px 18px; border: none; border-radius: 999px;
+                  background: linear-gradient(135deg, $accentColorHex, $accentColorEndHex); color: #fff;
+                  font-size: 14px; font-weight: 700; cursor: pointer; box-shadow: 0 8px 26px rgba(0, 0, 0, 0.5);
                 }
               </style>
             </head>
@@ -1338,84 +1357,83 @@ class MediaHttpServer(
               <meta name="viewport" content="width=device-width, initial-scale=1">
               <title>Remote: ${escapeHtml(title)}</title>
               <style>
-                :root { --accent: $accentColorHex; }
-                * { box-sizing: border-box; }
+                $themeTokensCss
                 body {
-                  margin: 0 auto; max-width: 1120px;
-                  padding: max(20px, env(safe-area-inset-top)) clamp(16px, 4vw, 40px) 24px;
-                  background: #121218; color: #e5e1e9;
-                  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                  -webkit-font-smoothing: antialiased;
+                  margin: 0 auto; max-width: 1180px; min-height: 100vh;
+                  padding: max(22px, env(safe-area-inset-top)) clamp(16px, 4vw, 44px) 28px;
                 }
                 /* Set on <body> only while a video is selected (see the controlPanel below) — the
                    panel is fixed/floating, so without this the bottom of the folder/video grid
                    would sit hidden underneath it. */
-                body.hasControlPanel { padding-bottom: 210px; }
-                h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -0.01em; }
-                .subtitle { margin: 0 0 16px; color: #888; font-size: 13px; }
-                /* Floats over the bottom of the page instead of sitting inline at the top, so
-                   the transport controls stay reachable without scrolling back up while
-                   browsing for the next video to pick. */
+                body.hasControlPanel { padding-bottom: 300px; }
+                h1 { font-size: clamp(26px, 6vw, 40px); font-weight: 800; margin: 0 0 8px; letter-spacing: -0.03em; line-height: 1.05; }
+                .subtitle { margin: 0 0 22px; color: var(--muted); font-size: 14px; line-height: 1.5; max-width: 640px; }
+                /* Floats over the bottom of the page, so the transport controls stay reachable
+                   while browsing for the next video to pick. */
                 .controlPanel {
                   position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
-                  padding: 14px clamp(16px, 4vw, 40px) calc(14px + env(safe-area-inset-bottom));
-                  background: rgba(24, 27, 36, 0.92); backdrop-filter: blur(12px);
-                  border-top: 1px solid #262a36;
-                  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.45);
+                  padding: 16px clamp(12px, 4vw, 40px) calc(16px + env(safe-area-inset-bottom));
+                  background: rgba(14, 14, 24, 0.82); backdrop-filter: blur(22px) saturate(1.4);
+                  border-top: 1px solid var(--line); border-radius: 28px 28px 0 0;
+                  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.55);
                 }
                 .controlPanel > * { max-width: 1040px; margin-left: auto; margin-right: auto; }
                 .nowPlayingCard {
-                  display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 10px; margin-bottom: 8px;
-                  background: #1c1f28; border-radius: 12px;
+                  display: flex; align-items: center; flex-wrap: wrap; gap: 14px; padding: 10px; margin-bottom: 10px;
+                  background: var(--glass-hi); border: 1px solid var(--line); border-radius: 20px;
                 }
-                .nowPlayingThumb { width: 64px; aspect-ratio: 16 / 9; object-fit: cover; background: #000; border-radius: 8px; flex-shrink: 0; }
+                .nowPlayingThumb { width: 76px; aspect-ratio: 16 / 9; object-fit: cover; background: #000; border-radius: 12px; flex-shrink: 0; }
                 .nowPlayingInfo { flex: 1; min-width: 120px; }
-                .nowPlayingLabel { margin: 0 0 2px; font-size: 11px; color: #888; }
-                .nowPlayingTitle { margin: 0; font-size: 14px; word-break: break-word; }
+                .nowPlayingLabel {
+                  margin: 0 0 3px; font-size: 11px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
+                  background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent;
+                }
+                .nowPlayingTitle { margin: 0; font-size: 15px; font-weight: 700; word-break: break-word; }
                 .exitButton {
-                  flex-shrink: 0; padding: 8px 14px; border-radius: 999px; border: none; cursor: pointer;
-                  background: #c66666; color: #eee; font-size: 12px; font: inherit; display: flex; column-gap: 5px; align-items: center;
+                  flex-shrink: 0; padding: 10px 16px; border-radius: 999px; cursor: pointer; font: inherit;
+                  font-size: 13px; font-weight: 700; display: flex; column-gap: 6px; align-items: center;
+                  background: rgba(255, 92, 122, 0.14); color: #ff8fa3; border: 1px solid rgba(255, 92, 122, 0.4);
+                  transition: background 0.2s ease;
                 }
-                .exitButton:hover { background: #e07f7f; }
-                .playFunctionPanel {
-                  display: flex; gap: 10px;
-                }
+                .exitButton svg { width: 20px; height: 20px; }
+                .exitButton:hover { background: rgba(255, 92, 122, 0.26); }
+                .playFunctionPanel { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
                 .toggle {
-                  display: flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px;
-                  background: #262a36; font-size: 12px; color: #ccc; white-space: nowrap; cursor: pointer;
-                  flex-shrink: 0;
+                  display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 999px;
+                  background: var(--glass-hi); border: 1px solid var(--line); font-size: 13px; font-weight: 600;
+                  color: var(--muted); white-space: nowrap; cursor: pointer; flex-shrink: 0; transition: all 0.2s ease;
                 }
-                .toggle > input {
-                    display: none;
-                }
-                .toggle:has(input:checked) { background: var(--accent); color: #fff; }
+                .toggle > input { display: none; }
+                .toggle:has(input:checked) { background: var(--grad); color: #fff; border-color: transparent; box-shadow: var(--glow); }
                 /* This is a control panel, not a viewing screen — the video itself stays loaded
-                   (so the seek bar/duration are real) but is never shown or heard; a plain
-                   button + range-input scrub bar drive it instead of an embedded video player's
-                   own on-screen controls. display:none is deliberately avoided here — some
-                   browsers/WebViews throttle or refuse to actually play a display:none video,
-                   which is why the picture never showed up as "playing"; this keeps it laid out
-                   and decoding, just invisible and out of the way. */
+                   (so the seek bar/duration are real) but is never shown or heard. display:none is
+                   deliberately avoided here — some browsers/WebViews throttle or refuse to play a
+                   display:none video; this keeps it laid out and decoding, just invisible. */
                 .hiddenVideo {
                   position: fixed; top: 0; left: 0; width: 1px; height: 1px;
                   opacity: 0; pointer-events: none;
                 }
                 .transportControls {
-                  display: flex; flex-wrap: wrap-reverse; align-items: center; gap: 10px; padding: 10px 14px;
-                  background: #1c1f28; border-radius: 12px;
+                  display: flex; flex-wrap: wrap-reverse; align-items: center; gap: 12px; padding: 12px 14px;
+                  background: var(--glass-hi); border: 1px solid var(--line); border-radius: 22px;
                 }
                 .transportControlsSection {
-                  display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%;
+                  display: flex; align-items: center; justify-content: center; gap: 14px; width: 100%;
                 }
                 .ctrlButton {
-                  flex-shrink: 0; width: 76px; height: 76px; border-radius: 50%; border: none; cursor: pointer;
-                  background: var(--accent); color: #fff; font-size: 15px; line-height: 1;
+                  flex-shrink: 0; width: 80px; height: 80px; border-radius: 50%; border: none; cursor: pointer;
+                  background: var(--grad); color: #fff; font-size: 15px; line-height: 1; box-shadow: var(--glow);
                   display: flex; align-items: center; justify-content: center;
+                  transition: transform 0.15s ease, box-shadow 0.2s ease;
                 }
                 .ctrlButton svg { width: 58px; height: 58px; }
-                .ctrlButton:hover { opacity: 0.85; }
-                .ctrlButton.navButton { background: #262a36; width: 60px; height: 60px; }
-                .ctrlButton.navButton:hover { background: #333846; }
+                .ctrlButton:hover { transform: scale(1.05); }
+                .ctrlButton:active { transform: scale(0.94); }
+                .ctrlButton.navButton {
+                  background: rgba(255, 255, 255, 0.07); border: 1px solid var(--line);
+                  width: 60px; height: 60px; box-shadow: none;
+                }
+                .ctrlButton.navButton:hover { background: rgba(255, 255, 255, 0.14); }
                 .ctrlButton.navButton svg { width: 32px; height: 32px; }
                 /* Skip buttons pair a circular replay/forward arrow with the seconds count
                    overlaid in its hollow centre, so the exact jump size is visible on the button. */
@@ -1423,52 +1441,77 @@ class MediaHttpServer(
                 .ctrlButton.skipButton.navButton svg { width: 38px; height: 38px; }
                 .skipNum {
                   position: absolute; top: 50%; left: 50%; transform: translate(-50%, -42%);
-                  font-size: 14px; font-weight: 700; line-height: 1; pointer-events: none;
+                  font-size: 14px; font-weight: 800; line-height: 1; pointer-events: none;
                 }
-                .ctrlButton:disabled { opacity: 0.35; cursor: default; }
-                .ctrlButton:disabled:hover { background: #262a36; }
-                .timeLabel { flex-shrink: 0; width: 46px; font-size: 14px; color: #ccc; text-align: center; }
-                .seekBar { flex: 1; accent-color: var(--accent); cursor: pointer; }
-                .placeholder { margin: 0 0 20px; padding: 32px; text-align: center; color: #888; background: #1c1f28; border-radius: 12px; }
-                .bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; font-size: 13px; }
-                .bar .label { color: #888; margin-right: 2px; }
+                .ctrlButton:disabled { opacity: 0.3; cursor: default; transform: none; }
+                .ctrlButton:disabled:hover { background: rgba(255, 255, 255, 0.07); }
+                .timeLabel { flex-shrink: 0; width: 48px; font-size: 13px; font-weight: 600; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
+                .seekBar {
+                  flex: 1; height: 6px; cursor: pointer; -webkit-appearance: none; appearance: none;
+                  border-radius: 999px; background: rgba(255, 255, 255, 0.16); accent-color: var(--accent-2);
+                }
+                .seekBar::-webkit-slider-thumb {
+                  -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%;
+                  background: #fff; box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-2) 45%, transparent);
+                }
+                .seekBar::-moz-range-thumb { width: 20px; height: 20px; border: none; border-radius: 50%; background: #fff; }
+                .seekBar::-moz-range-progress { height: 6px; border-radius: 999px; background: var(--grad); }
+                .placeholder {
+                  margin: 0 0 24px; padding: 36px 28px; text-align: center; color: var(--muted); font-size: 15px;
+                  background: var(--glass); backdrop-filter: blur(14px); border: 1px dashed var(--line); border-radius: var(--radius-l);
+                }
+                #takeControlButton { box-shadow: var(--glow); font-weight: 800; font-size: 16px; }
+                .bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; font-size: 14px; }
+                .bar .label { color: var(--faint); margin-right: 4px; font-weight: 600; }
                 .bar a, .bar .active {
-                  padding: 6px 14px; border-radius: 999px; text-decoration: none; font-size: 13px;
+                  padding: 10px 18px; border-radius: 999px; text-decoration: none; font-size: 14px; border: 1px solid var(--line);
                 }
-                .bar a { color: #ccc; background: #1c1f28; }
-                .bar a:hover { background: #262a36; }
-                .bar .active { background: var(--accent); color: #fff; font-weight: 600; }
-                ul.folders { list-style: none; padding: 0; margin: 0 0 16px; }
-                ul.folders li { margin: 6px 0; }
+                .bar a { color: var(--muted); background: var(--glass); backdrop-filter: blur(14px); }
+                .bar a:hover { background: var(--glass-hi); color: var(--text); }
+                .bar .active { background: var(--grad); color: #fff; font-weight: 700; border-color: transparent; box-shadow: var(--glow); }
+                ul.folders { list-style: none; padding: 0; margin: 0 0 22px; display: grid; gap: 12px;
+                  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); }
+                ul.folders li { margin: 0; }
                 ul.folders a {
-                  display: flex; align-items: center; gap: 10px; padding: 12px 16px;
-                  background: #1c1f28; color: #fff; text-decoration: none; border-radius: 12px;
-                  transition: background 0.15s ease;
+                  display: flex; align-items: center; gap: 14px; padding: 16px 18px;
+                  background: var(--glass); backdrop-filter: blur(14px); border: 1px solid var(--line);
+                  color: var(--text); text-decoration: none; border-radius: var(--radius-m);
+                  font-size: 15px; font-weight: 600; transition: background 0.2s ease, transform 0.2s ease;
                 }
-                ul.folders a:hover { background: #262a36; }
-                ul.folders a.back { color: #ccc; }
+                ul.folders a svg { flex-shrink: 0; width: 22px; height: 22px; color: var(--accent-2); }
+                ul.folders a:hover { background: var(--glass-hi); transform: translateY(-2px); }
+                ul.folders a.back { color: var(--muted); }
                 ul.videos {
                   list-style: none; padding: 0; margin: 0; display: grid;
-                  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px;
+                  grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr)); gap: 16px;
                 }
                 .videoCard {
-                  display: flex; flex-direction: column; width: 100%; background: #1c1f28; color: #fff;
-                  border: 2px solid transparent; border-radius: 12px; overflow: hidden; padding: 0;
+                  display: flex; flex-direction: column; width: 100%; color: var(--text);
+                  background: var(--glass); backdrop-filter: blur(14px); border: 1px solid var(--line);
+                  border-radius: var(--radius-m); overflow: hidden; padding: 8px;
                   font: inherit; text-align: left; cursor: pointer;
-                  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+                  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
                 }
-                .videoCard:hover { background: #262a36; transform: translateY(-2px); }
-                .videoCard.selected { border-color: var(--accent); }
-                .videoCard .thumb { display: block; position: relative; background: #000; }
+                .videoCard:hover, .videoCard:focus-visible {
+                  transform: translateY(-4px); outline: none;
+                  border-color: color-mix(in srgb, var(--accent-2) 55%, transparent);
+                  box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.7);
+                }
+                .videoCard.selected { border: 2px solid var(--accent-2); box-shadow: var(--glow); }
+                .videoCard .thumb { display: block; position: relative; background: #000; border-radius: 16px; overflow: hidden; }
                 .videoCard .thumb img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; }
                 .videoCard .play-badge {
-                  position: absolute; right: 6px; bottom: 6px; display: flex; opacity: 0.9;
+                  position: absolute; right: 10px; bottom: 10px; display: flex;
+                  width: 36px; height: 36px; border-radius: 50%; background: var(--grad); color: #fff;
+                  align-items: center; justify-content: center; box-shadow: var(--glow);
                 }
-                .videoCard .title { display: block; padding: 8px 8px 0; font-size: 13px; word-break: break-word; }
-                .videoCard .sub { display: block; padding: 2px 8px 8px; font-size: 11px; color: #888; word-break: break-word; }
+                .videoCard .play-badge svg { width: 22px; height: 22px; }
+                .videoCard .title { display: block; padding: 12px 6px 2px; font-size: 14px; font-weight: 600; word-break: break-word; line-height: 1.35; }
+                .videoCard .sub { display: block; padding: 2px 6px 8px; font-size: 12px; font-weight: 600; color: var(--accent-2); word-break: break-word; }
               </style>
             </head>
             <body${if (currentEntry != null) " class=\"hasControlPanel\"" else ""}>
+              $brandHeaderHtml
               <h1>${escapeHtml(title)}</h1>
               <p class="subtitle">${if (isFolderMode) "Every connected viewer sees exactly what plays here — pick a video, then use the player controls to drive playback for everyone." else "Every connected viewer sees exactly what plays here — use the player controls to drive playback for everyone."}</p>
               $playerSection

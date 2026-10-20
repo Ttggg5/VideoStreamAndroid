@@ -2,27 +2,31 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="brand_primary">#4A5FFF</color>
-    <color name="text">#FF1B1B21</color>
+    <!-- Default brand gradient (Aurora); the active one comes from the accent theme overlay. -->
+    <color name="brand_primary">#7C4DFF</color>
+    <color name="brand_secondary">#FF4FA3</color>
+    <color name="text">#FFF3F1FB</color>
     <color name="transparent">#00000000</color>
 
-    <!-- Streaming start/stop accents used by HostActivity's toggle button. -->
-    <color name="start">#3B9E7A</color>
-    <color name="stop">#C0504D</color>
+    <color name="start">#2EE6A6</color>
+    <color name="stop">#FF5C7A</color>
 
-    <!-- Material 3 neutral surface ramp (light). These don't depend on the accent color, so the
-         runtime accent overlay can keep swapping only colorPrimary while surfaces stay coherent
-         in both light and dark. See values-night/colors.xml for the dark values. -->
-    <color name="md_surface">#FBF8FE</color>
-    <color name="md_surface_container_lowest">#FFFFFF</color>
-    <color name="md_surface_container_low">#F5F2FA</color>
-    <color name="md_surface_container">#EFECF4</color>
-    <color name="md_surface_container_high">#E9E6EF</color>
-    <color name="md_surface_container_highest">#E3E0E9</color>
-    <color name="md_surface_variant">#E3E0EC</color>
-    <color name="md_on_surface">#1B1B21</color>
-    <color name="md_on_surface_variant">#47464F</color>
-    <color name="md_outline">#787680</color>
-    <color name="md_outline_variant">#C8C5D0</color>
+    <!-- Dark cinematic palette (the app is always dark). -->
+    <color name="md_surface">#0A0A12</color>
+    <color name="md_surface_container_lowest">#07070D</color>
+    <color name="md_surface_container_low">#101019</color>
+    <color name="md_surface_container">#14141E</color>
+    <color name="md_surface_container_high">#1C1C29</color>
+    <color name="md_surface_container_highest">#25253A</color>
+    <color name="md_surface_variant">#25253A</color>
+    <color name="md_on_surface">#F3F1FB</color>
+    <color name="md_on_surface_variant">#A9A5BE</color>
+    <color name="md_outline">#3A3A55</color>
+    <color name="md_outline_variant">#2E2E44</color>
     <color name="md_scrim">#99000000</color>
+
+    <!-- Translucent "glass" surfaces layered over the canvas glow. -->
+    <color name="glass_fill">#B3171724</color>
+    <color name="glass_fill_strong">#E61C1C2B</color>
+    <color name="glass_stroke">#1FFFFFFF</color>
 </resources>

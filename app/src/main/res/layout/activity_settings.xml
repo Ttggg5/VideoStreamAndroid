@@ -3,31 +3,26 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/colorSurface"
+    android:background="@drawable/bg_screen_glow"
     android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingHorizontal="@dimen/screen_horizontal_margin"
-        android:paddingTop="16dp"
-        android:paddingBottom="32dp">
+        android:padding="@dimen/screen_horizontal_margin">
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp"
             android:text="@string/settings"
-            android:textAppearance="?attr/textAppearanceHeadlineMedium"
-            android:textColor="?attr/colorOnSurface"
-            android:textStyle="bold" />
+            android:textAppearance="@style/TextAppearance.App.Display" />
 
-        <!-- Appearance group -->
+        <!-- Gradient theme -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="28dp"
             android:layout_marginBottom="10dp"
             android:text="@string/settings_accent_color"
             android:textAppearance="@style/TextAppearance.App.SectionLabel" />
@@ -35,106 +30,72 @@
         <com.google.android.material.card.MaterialCardView
             style="@style/Widget.App.Card"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:cardBackgroundColor="?attr/colorSurfaceContainer"
-            app:cardCornerRadius="24dp">
+            android:layout_height="wrap_content">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="16dp">
+                android:paddingVertical="18dp">
 
-                <LinearLayout
-                    android:id="@+id/accentColorRow"
+                <HorizontalScrollView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal" />
+                    android:clipToPadding="false"
+                    android:paddingHorizontal="18dp"
+                    android:scrollbars="none">
+
+                    <LinearLayout
+                        android:id="@+id/accentColorRow"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+
+                </HorizontalScrollView>
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:paddingHorizontal="18dp"
+                    android:text="@string/settings_theme_helper"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:textSize="12sp" />
 
             </LinearLayout>
 
         </com.google.android.material.card.MaterialCardView>
 
+        <!-- Streaming -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
+            android:layout_marginTop="26dp"
             android:layout_marginBottom="10dp"
-            android:text="@string/settings_theme"
+            android:text="@string/settings_streaming"
             android:textAppearance="@style/TextAppearance.App.SectionLabel" />
 
         <com.google.android.material.card.MaterialCardView
             style="@style/Widget.App.Card"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:cardBackgroundColor="?attr/colorSurfaceContainer"
-            app:cardCornerRadius="24dp">
-
-            <RadioGroup
-                android:id="@+id/themeRadioGroup"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="8dp">
-
-                <RadioButton
-                    android:id="@+id/themeSystemRadio"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:minHeight="48dp"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp"
-                    android:text="@string/theme_system" />
-
-                <RadioButton
-                    android:id="@+id/themeLightRadio"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:minHeight="48dp"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp"
-                    android:text="@string/theme_light" />
-
-                <RadioButton
-                    android:id="@+id/themeDarkRadio"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:minHeight="48dp"
-                    android:paddingStart="8dp"
-                    android:paddingEnd="8dp"
-                    android:text="@string/theme_dark" />
-
-            </RadioGroup>
-
-        </com.google.android.material.card.MaterialCardView>
-
-        <!-- Streaming group -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:layout_marginBottom="10dp"
-            android:text="@string/settings_port"
-            android:textAppearance="@style/TextAppearance.App.SectionLabel" />
-
-        <com.google.android.material.card.MaterialCardView
-            style="@style/Widget.App.Card"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:cardBackgroundColor="?attr/colorSurfaceContainer"
-            app:cardCornerRadius="24dp">
+            android:layout_height="wrap_content">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:padding="16dp">
+                android:padding="18dp">
 
                 <com.google.android.material.textfield.TextInputLayout
                     style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="@string/settings_port_hint">
+                    android:hint="@string/settings_port_hint"
+                    app:boxCornerRadiusBottomEnd="18dp"
+                    app:boxCornerRadiusBottomStart="18dp"
+                    app:boxCornerRadiusTopEnd="18dp"
+                    app:boxCornerRadiusTopStart="18dp"
+                    app:boxStrokeColor="?attr/colorSecondary">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/portInput"
@@ -153,20 +114,17 @@
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="12sp" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="20dp"
-                    android:layout_marginBottom="4dp"
-                    android:text="@string/settings_skip_seconds"
-                    android:textColor="?attr/colorOnSurface"
-                    android:textStyle="bold" />
-
                 <com.google.android.material.textfield.TextInputLayout
                     style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="@string/settings_skip_seconds_hint">
+                    android:layout_marginTop="20dp"
+                    android:hint="@string/settings_skip_seconds_hint"
+                    app:boxCornerRadiusBottomEnd="18dp"
+                    app:boxCornerRadiusBottomStart="18dp"
+                    app:boxCornerRadiusTopEnd="18dp"
+                    app:boxCornerRadiusTopStart="18dp"
+                    app:boxStrokeColor="?attr/colorSecondary">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/skipSecondsInput"
@@ -189,11 +147,11 @@
 
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Playback group -->
+        <!-- Playback -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
+            android:layout_marginTop="26dp"
             android:layout_marginBottom="10dp"
             android:text="@string/settings_playback"
             android:textAppearance="@style/TextAppearance.App.SectionLabel" />
@@ -201,9 +159,7 @@
         <com.google.android.material.card.MaterialCardView
             style="@style/Widget.App.Card"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            app:cardBackgroundColor="?attr/colorSurfaceContainer"
-            app:cardCornerRadius="24dp">
+            android:layout_height="wrap_content">
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -216,7 +172,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center_vertical"
-                    android:minHeight="56dp"
+                    android:minHeight="60dp"
                     android:orientation="horizontal">
 
                     <TextView
@@ -224,6 +180,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/settings_keep_screen_on"
+                        android:textAppearance="?attr/textAppearanceBodyLarge"
                         android:textColor="?attr/colorOnSurface" />
 
                     <com.google.android.material.materialswitch.MaterialSwitch
@@ -236,13 +193,13 @@
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
-                    android:background="?attr/colorOutlineVariant" />
+                    android:background="@color/glass_stroke" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center_vertical"
-                    android:minHeight="56dp"
+                    android:minHeight="60dp"
                     android:orientation="horizontal">
 
                     <TextView
@@ -250,6 +207,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:text="@string/settings_vibrate_on_control"
+                        android:textAppearance="?attr/textAppearanceBodyLarge"
                         android:textColor="?attr/colorOnSurface" />
 
                     <com.google.android.material.materialswitch.MaterialSwitch
@@ -262,7 +220,7 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginBottom="10dp"
+                    android:layout_marginBottom="12dp"
                     android:text="@string/settings_vibrate_on_control_helper"
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:textSize="12sp" />

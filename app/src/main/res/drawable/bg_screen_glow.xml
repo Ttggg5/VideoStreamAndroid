@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dark canvas with two soft brand-colored glows bleeding in from the top corners. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/md_surface" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:centerX="0.1"
+                android:centerY="0.0"
+                android:endColor="#000A0A12"
+                android:gradientRadius="420dp"
+                android:startColor="?attr/brandGlowPrimary"
+                android:type="radial" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:centerX="0.95"
+                android:centerY="0.05"
+                android:endColor="#000A0A12"
+                android:gradientRadius="360dp"
+                android:startColor="?attr/brandGlowSecondary"
+                android:type="radial" />
+        </shape>
+    </item>
+</layer-list>

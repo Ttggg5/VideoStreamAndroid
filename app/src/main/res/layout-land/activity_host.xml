@@ -1,206 +1,236 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- Two-pane (landscape / unfolded): choose + preview on the left, go-live on the right. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/colorSurface"
-    android:padding="@dimen/screen_horizontal_margin"
+    android:background="@drawable/bg_screen_glow"
+    android:baselineAligned="false"
+    android:orientation="horizontal"
     tools:context=".HostActivity">
 
-    <!-- Two-pane: the picker + preview on the left, the streaming action on the right, so the
-         extra width of a landscape phone / unfolded foldable is used instead of a tall column. -->
-    <androidx.constraintlayout.widget.Guideline
-        android:id="@+id/paneSplit"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        app:layout_constraintGuide_percent="0.56" />
-
-    <LinearLayout
-        android:id="@+id/pickerButtons"
+    <ScrollView
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        app:layout_constraintEnd_toStartOf="@id/paneSplit"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/chooseFileButton"
-            style="@style/Widget.App.Button.Tonal"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_marginEnd="8dp"
-            android:layout_weight="1"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:text="@string/choose_video"
-            app:icon="@drawable/ic_videocam" />
-
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/chooseFolderButton"
-            style="@style/Widget.App.Button.Tonal"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:text="@string/choose_folder"
-            app:icon="@drawable/ic_folder" />
-
-    </LinearLayout>
-
-    <com.google.android.material.card.MaterialCardView
-        android:id="@+id/previewCard"
-        style="@style/Widget.App.Card"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_marginTop="14dp"
-        app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
-        app:cardCornerRadius="24dp"
-        app:layout_constraintBottom_toTopOf="@id/selectedFileText"
-        app:layout_constraintEnd_toStartOf="@id/paneSplit"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/pickerButtons"
-        app:layout_constraintVertical_chainStyle="packed">
-
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent">
-
-            <ImageView
-                android:id="@+id/thumbnailPreview"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:contentDescription="@string/selected_video_thumbnail"
-                android:scaleType="centerCrop"
-                android:visibility="gone"
-                tools:visibility="visible" />
-
-            <ImageView
-                android:id="@+id/folderPreview"
-                android:layout_width="72dp"
-                android:layout_height="72dp"
-                android:layout_gravity="center"
-                android:contentDescription="@null"
-                android:src="@drawable/ic_folder"
-                android:visibility="gone"
-                app:tint="?attr/colorPrimary" />
-
-        </FrameLayout>
-
-    </com.google.android.material.card.MaterialCardView>
-
-    <TextView
-        android:id="@+id/selectedFileText"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:gravity="center"
-        android:text="@string/no_video_selected"
-        android:textAppearance="?attr/textAppearanceBodyLarge"
-        android:textColor="?attr/colorOnSurface"
-        app:layout_constraintBottom_toTopOf="@id/sortOptionRow"
-        app:layout_constraintEnd_toStartOf="@id/paneSplit"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/previewCard" />
-
-    <com.google.android.material.card.MaterialCardView
-        android:id="@+id/sortOptionRow"
-        android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:visibility="gone"
-        app:cardBackgroundColor="?attr/colorSurfaceContainer"
-        app:cardCornerRadius="18dp"
-        app:cardElevation="0dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toStartOf="@id/paneSplit"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/selectedFileText"
-        tools:visibility="visible">
+        android:layout_height="match_parent"
+        android:layout_weight="1.15"
+        android:fillViewport="true">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingStart="18dp"
-            android:paddingTop="6dp"
-            android:paddingEnd="10dp"
-            android:paddingBottom="6dp">
+            android:orientation="vertical"
+            android:paddingStart="@dimen/screen_horizontal_margin"
+            android:paddingTop="20dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="20dp">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
-                android:text="@string/option_default_sort"
-                android:textColor="?attr/colorOnSurfaceVariant" />
+                android:text="@string/host_a_video"
+                android:textAppearance="@style/TextAppearance.App.Display" />
 
-            <Spinner
-                android:id="@+id/defaultSortSpinner"
-                android:layout_width="0dp"
+            <TextView
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1" />
+                android:layout_marginTop="16dp"
+                android:text="@string/host_step_pick"
+                android:textAppearance="@style/TextAppearance.App.SectionLabel" />
+
+            <!-- 0dp+weight keeps this pair from overflowing narrow screens / large font scales. -->
+            <LinearLayout
+                android:id="@+id/pickerButtons"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/chooseFileButton"
+                    style="@style/Widget.App.Button.Glass"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="10dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="@string/choose_video"
+                    app:icon="@drawable/ic_videocam" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/chooseFolderButton"
+                    style="@style/Widget.App.Button.Glass"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="@string/choose_folder"
+                    app:icon="@drawable/ic_folder" />
+
+            </LinearLayout>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/previewCard"
+                style="@style/Widget.App.Card"
+                android:layout_width="match_parent"
+                android:layout_height="170dp"
+                android:layout_marginTop="16dp">
+
+                <FrameLayout
+                    android:id="@+id/selectedPreview"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent">
+
+                    <ImageView
+                        android:id="@+id/thumbnailPreview"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:contentDescription="@string/selected_video_thumbnail"
+                        android:scaleType="centerCrop"
+                        android:visibility="gone"
+                        tools:visibility="visible" />
+
+                    <FrameLayout
+                        android:id="@+id/folderPreview"
+                        android:layout_width="84dp"
+                        android:layout_height="84dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_brand_gradient_round"
+                        android:visibility="gone">
+
+                        <ImageView
+                            android:layout_width="44dp"
+                            android:layout_height="44dp"
+                            android:layout_gravity="center"
+                            android:contentDescription="@null"
+                            android:src="@drawable/ic_folder"
+                            app:tint="@color/white" />
+
+                    </FrameLayout>
+
+                </FrameLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <TextView
+                android:id="@+id/selectedFileText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:gravity="center"
+                android:text="@string/no_video_selected"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:textColor="?attr/colorOnSurface" />
+
+            <LinearLayout
+                android:id="@+id/sortOptionRow"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:background="@drawable/bg_glass_pill"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="20dp"
+                android:paddingTop="4dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="4dp"
+                android:visibility="gone"
+                tools:visibility="visible">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="8dp"
+                    android:text="@string/option_default_sort"
+                    android:textColor="?attr/colorOnSurfaceVariant" />
+
+                <Spinner
+                    android:id="@+id/defaultSortSpinner"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1" />
+
+            </LinearLayout>
 
         </LinearLayout>
 
-    </com.google.android.material.card.MaterialCardView>
+    </ScrollView>
 
-    <!-- Right pane: the big streaming toggle, its status line, and (while streaming) the
-         remote-control entry, packed and centered. -->
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/toggleButton"
-        android:layout_width="96dp"
-        android:layout_height="96dp"
-        android:enabled="false"
-        android:insetLeft="0dp"
-        android:insetTop="0dp"
-        android:insetRight="0dp"
-        android:insetBottom="0dp"
-        android:padding="0dp"
-        android:text="@string/start_streaming"
-        android:textSize="0dp"
-        app:cornerRadius="32dp"
-        app:icon="@drawable/ic_play_arrow"
-        app:iconGravity="textStart"
-        app:iconPadding="0dp"
-        app:iconSize="48dp"
-        app:iconTint="@color/white"
-        app:layout_constraintBottom_toTopOf="@id/statusText"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="@id/paneSplit"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_chainStyle="packed" />
-
-    <TextView
-        android:id="@+id/statusText"
+    <ScrollView
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="14dp"
-        android:gravity="center"
-        android:text="@string/status_idle"
-        android:textAppearance="?attr/textAppearanceBodyMedium"
-        android:textColor="?attr/colorOnSurfaceVariant"
-        app:layout_constraintBottom_toTopOf="@id/remoteControlButton"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="@id/paneSplit"
-        app:layout_constraintTop_toBottomOf="@id/toggleButton" />
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:fillViewport="true">
 
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/remoteControlButton"
-        style="@style/Widget.App.Button.Tonal"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="@string/remote_control"
-        android:visibility="gone"
-        app:icon="@drawable/ic_remote"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="@id/paneSplit"
-        app:layout_constraintTop_toBottomOf="@id/statusText"
-        tools:visibility="visible" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:paddingStart="12dp"
+            android:paddingTop="20dp"
+            android:paddingEnd="@dimen/screen_horizontal_margin"
+            android:paddingBottom="20dp">
 
-</androidx.constraintlayout.widget.ConstraintLayout>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/host_step_start"
+                android:textAppearance="@style/TextAppearance.App.SectionLabel" />
+
+            <!-- Glowing gradient circle; dims to glass while disabled (see bg_start_button). -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/toggleButton"
+                android:layout_width="132dp"
+                android:layout_height="132dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/bg_start_button"
+                android:enabled="false"
+                android:insetLeft="0dp"
+                android:insetTop="0dp"
+                android:insetRight="0dp"
+                android:insetBottom="0dp"
+                android:padding="0dp"
+                android:text="@string/start_streaming"
+                android:textSize="0dp"
+                app:backgroundTint="@null"
+                app:icon="@drawable/ic_play_arrow"
+                app:iconGravity="textStart"
+                app:iconPadding="0dp"
+                app:iconSize="52dp"
+                app:iconTint="@color/white" />
+
+            <TextView
+                android:id="@+id/statusText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="14dp"
+                android:background="@drawable/bg_glass_pill"
+                android:gravity="center"
+                android:paddingHorizontal="18dp"
+                android:paddingVertical="10dp"
+                android:text="@string/status_idle"
+                android:textAppearance="?attr/textAppearanceBodyMedium"
+                android:textColor="?attr/colorOnSurface"
+                android:textIsSelectable="true" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/remoteControlButton"
+                style="@style/Widget.App.Button.Gradient"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="22dp"
+                android:text="@string/remote_control"
+                android:visibility="gone"
+                app:icon="@drawable/ic_remote"
+                tools:visibility="visible" />
+
+        </LinearLayout>
+
+    </ScrollView>
+
+</LinearLayout>

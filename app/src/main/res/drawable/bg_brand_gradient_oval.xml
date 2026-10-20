@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Circular brand-gradient button with a soft outer glow ring (Host Start/Stop). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="oval">
+            <gradient
+                android:endColor="#00000000"
+                android:gradientRadius="50%p"
+                android:startColor="#55FFFFFF"
+                android:type="radial" />
+        </shape>
+    </item>
+    <item android:bottom="10dp" android:left="10dp" android:right="10dp" android:top="10dp">
+        <shape android:shape="oval">
+            <gradient
+                android:angle="315"
+                android:endColor="?attr/colorSecondary"
+                android:startColor="?attr/colorPrimary"
+                android:type="linear" />
+        </shape>
+    </item>
+</layer-list>

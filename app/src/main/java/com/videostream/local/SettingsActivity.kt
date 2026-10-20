@@ -7,14 +7,14 @@ import android.view.Gravity
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
-import androidx.core.content.ContextCompat
+import android.widget.TextView
+import com.google.android.material.color.MaterialColors
 import com.videostream.local.databinding.ActivitySettingsBinding
 
 /**
- * Lets the user customize the app's accent color, light/dark mode, default streaming port,
- * and whether the screen stays on while watching. [BaseActivity] re-themes every other open
- * activity automatically once the accent color changes here; light/dark mode changes are
- * picked up by [androidx.appcompat.app.AppCompatDelegate] on its own.
+ * Lets the user pick a gradient theme, the default streaming port, the skip interval, and
+ * playback preferences. [BaseActivity] re-themes every other open activity automatically once
+ * the theme changes here. (The app is always dark, so there's no light/dark choice.)
  */
 class SettingsActivity : BaseActivity() {
 
@@ -26,22 +26,6 @@ class SettingsActivity : BaseActivity() {
         setContentView(binding.root)
 
         renderAccentSwatches()
-
-        binding.themeRadioGroup.check(
-            when (AppSettings.getThemeMode(this)) {
-                AppSettings.ThemeMode.SYSTEM -> R.id.themeSystemRadio
-                AppSettings.ThemeMode.LIGHT -> R.id.themeLightRadio
-                AppSettings.ThemeMode.DARK -> R.id.themeDarkRadio
-            }
-        )
-        binding.themeRadioGroup.setOnCheckedChangeListener { _, checkedId ->
-            val mode = when (checkedId) {
-                R.id.themeLightRadio -> AppSettings.ThemeMode.LIGHT
-                R.id.themeDarkRadio -> AppSettings.ThemeMode.DARK
-                else -> AppSettings.ThemeMode.SYSTEM
-            }
-            AppSettings.setThemeMode(this, mode)
-        }
 
         binding.portInput.setText(AppSettings.getHttpPort(this).toString())
         binding.portInput.setOnFocusChangeListener { _, hasFocus ->
@@ -92,31 +76,28 @@ class SettingsActivity : BaseActivity() {
         }
     }
 
+    /** One gradient circle + name per [AppSettings.AccentColor]; tapping one re-themes. */
     private fun renderAccentSwatches() {
         binding.accentColorRow.removeAllViews()
         val selected = AppSettings.getAccentColor(this)
         val swatchSize = resources.getDimensionPixelSize(R.dimen.accent_swatch_size)
         val swatchMargin = resources.getDimensionPixelSize(R.dimen.accent_swatch_margin)
+        val density = resources.displayMetrics.density
 
         for (color in AppSettings.AccentColor.entries) {
-            val swatch = FrameLayout(this).apply {
-                layoutParams = LinearLayout.LayoutParams(swatchSize, swatchSize).apply {
-                    marginEnd = swatchMargin
-                }
-                background = ContextCompat.getDrawable(this@SettingsActivity, R.drawable.bg_color_swatch)
-                    ?.mutate()
-                    ?.also { (it as GradientDrawable).setColor(Color.parseColor(color.hex)) }
-                isClickable = true
-                isFocusable = true
-                contentDescription = getString(R.string.accent_color_description, getString(color.labelRes))
-                setOnClickListener {
-                    AppSettings.setAccentColor(this@SettingsActivity, color)
-                    renderAccentSwatches()
-                    recreate()
+            val isSelected = color == selected
+            val circle = FrameLayout(this).apply {
+                layoutParams = LinearLayout.LayoutParams(swatchSize, swatchSize)
+                background = GradientDrawable(
+                    GradientDrawable.Orientation.TL_BR,
+                    intArrayOf(Color.parseColor(color.startHex), Color.parseColor(color.endHex))
+                ).apply {
+                    shape = GradientDrawable.OVAL
+                    if (isSelected) setStroke((3 * density).toInt(), Color.WHITE)
                 }
             }
-            if (color == selected) {
-                val check = ImageView(this).apply {
+            if (isSelected) {
+                circle.addView(ImageView(this).apply {
                     layoutParams = FrameLayout.LayoutParams(
                         FrameLayout.LayoutParams.WRAP_CONTENT,
                         FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -124,10 +105,38 @@ class SettingsActivity : BaseActivity() {
                     )
                     setImageResource(R.drawable.ic_check)
                     setColorFilter(Color.WHITE)
-                }
-                swatch.addView(check)
+                })
             }
-            binding.accentColorRow.addView(swatch)
+            val label = TextView(this).apply {
+                text = getString(color.labelRes)
+                textSize = 12f
+                gravity = Gravity.CENTER
+                setTextColor(
+                    if (isSelected) Color.WHITE
+                    else MaterialColors.getColor(this, com.google.android.material.R.attr.colorOnSurfaceVariant, Color.GRAY)
+                )
+                setPadding(0, (6 * density).toInt(), 0, 0)
+            }
+            val item = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { marginEnd = swatchMargin }
+                isClickable = true
+                isFocusable = true
+                contentDescription = getString(R.string.accent_color_description, getString(color.labelRes))
+                setOnClickListener {
+                    if (!isSelected) {
+                        AppSettings.setAccentColor(this@SettingsActivity, color)
+                        recreate()
+                    }
+                }
+                addView(circle)
+                addView(label)
+            }
+            binding.accentColorRow.addView(item)
         }
     }
 }
